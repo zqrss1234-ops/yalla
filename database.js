@@ -1,111 +1,119 @@
-const Database = require('better-sqlite3');
+const fs = require('fs');
 const path = require('path');
 
 class LicenseDatabase {
   constructor(dbPath) {
-    this.db = new Database(dbPath || path.join(__dirname, 'licenses.db'));
-    this.db.pragma('journal_mode = WAL');
-    this.init();
+    this.dbPath = dbPath || path.join(__dirname, 'licenses.json');
+    this.data = { keys: [], nextId: 1 };
+    this.load();
   }
 
-  init() {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS licenses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT UNIQUE NOT NULL,
-        device_id TEXT,
-        device_name TEXT,
-        device_model TEXT,
-        ios_version TEXT,
-        bundle_id TEXT,
-        revoked INTEGER DEFAULT 0,
-        approved INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        activated_at DATETIME,
-        last_used DATETIME
-      )
-    `);
+  load() {
+    try {
+      if (fs.existsSync(this.dbPath)) {
+        const raw = fs.readFileSync(this.dbPath, 'utf8');
+        this.data = JSON.parse(raw);
+      }
+    } catch { }
+  }
+
+  save() {
+    try {
+      fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
+    } catch { }
   }
 
   addKey(key) {
-    const stmt = this.db.prepare('INSERT INTO licenses (key) VALUES (?)');
-    stmt.run(key);
+    this.data.keys.push({
+      id: this.data.nextId++,
+      key,
+      device_id: null,
+      device_name: null,
+      device_model: null,
+      ios_version: null,
+      bundle_id: null,
+      revoked: 0,
+      approved: 0,
+      created_at: new Date().toISOString(),
+      activated_at: null,
+      last_used: null
+    });
+    this.save();
   }
 
   findKey(key) {
-    const stmt = this.db.prepare('SELECT * FROM licenses WHERE key = ?');
-    return stmt.get(key);
+    return this.data.keys.find(k => k.key === key) || null;
   }
 
   addDeviceInfo(key, deviceId, deviceName, deviceModel, iosVersion, bundleId) {
-    const stmt = this.db.prepare(
-      `UPDATE licenses SET
-        device_id = ?, device_name = ?, device_model = ?,
-        ios_version = ?, bundle_id = ?, activated_at = CURRENT_TIMESTAMP
-       WHERE key = ?`
-    );
-    stmt.run(deviceId, deviceName || null, deviceModel || null, iosVersion || null, bundleId || null, key);
+    const k = this.findKey(key);
+    if (!k) return;
+    k.device_id = deviceId;
+    k.device_name = deviceName || null;
+    k.device_model = deviceModel || null;
+    k.ios_version = iosVersion || null;
+    k.bundle_id = bundleId || null;
+    k.activated_at = new Date().toISOString();
+    this.save();
   }
 
   approveKey(key) {
-    const stmt = this.db.prepare('UPDATE licenses SET approved = 1 WHERE key = ?');
-    stmt.run(key);
+    const k = this.findKey(key);
+    if (k) { k.approved = 1; this.save(); }
   }
 
   rejectKey(key) {
-    const stmt = this.db.prepare('UPDATE licenses SET approved = -1 WHERE key = ?');
-    stmt.run(key);
+    const k = this.findKey(key);
+    if (k) { k.approved = -1; this.save(); }
   }
 
   revokeKey(key) {
-    const stmt = this.db.prepare('UPDATE licenses SET revoked = 1 WHERE key = ?');
-    stmt.run(key);
+    const k = this.findKey(key);
+    if (k) { k.revoked = 1; this.save(); }
   }
 
   unrevokeKey(key) {
-    const stmt = this.db.prepare('UPDATE licenses SET revoked = 0 WHERE key = ?');
-    stmt.run(key);
+    const k = this.findKey(key);
+    if (k) { k.revoked = 0; this.save(); }
   }
 
   deleteKey(key) {
-    const stmt = this.db.prepare('DELETE FROM licenses WHERE key = ?');
-    stmt.run(key);
+    this.data.keys = this.data.keys.filter(k => k.key !== key);
+    this.save();
   }
 
   logUsage(key) {
-    const stmt = this.db.prepare('UPDATE licenses SET last_used = CURRENT_TIMESTAMP WHERE key = ?');
-    stmt.run(key);
+    const k = this.findKey(key);
+    if (k) { k.last_used = new Date().toISOString(); this.save(); }
   }
 
   getAllKeys() {
-    const stmt = this.db.prepare('SELECT * FROM licenses ORDER BY created_at DESC');
-    return stmt.all();
+    return [...this.data.keys].sort((a, b) =>
+      new Date(b.created_at) - new Date(a.created_at)
+    );
   }
 
   getPendingCount() {
-    const row = this.db.prepare(
-      "SELECT COUNT(*) as count FROM licenses WHERE device_id IS NOT NULL AND approved = 0 AND revoked = 0"
-    ).get();
-    return row.count;
+    return this.data.keys.filter(k =>
+      k.device_id && k.approved === 0 && !k.revoked
+    ).length;
   }
 
   getStats() {
-    const row = this.db.prepare(`
-      SELECT
-        COUNT(*) as total,
-        SUM(CASE WHEN revoked = 1 THEN 1 ELSE 0 END) as revoked_count,
-        SUM(CASE WHEN device_id IS NOT NULL AND approved = 1 AND revoked = 0 THEN 1 ELSE 0 END) as activated,
-        SUM(CASE WHEN device_id IS NULL AND revoked = 0 THEN 1 ELSE 0 END) as available,
-        SUM(CASE WHEN device_id IS NOT NULL AND approved = 0 AND revoked = 0 THEN 1 ELSE 0 END) as pending,
-        SUM(CASE WHEN last_used IS NOT NULL AND date(last_used) = date('now') THEN 1 ELSE 0 END) as active_today
-      FROM licenses
-    `).get();
-    return row;
+    const keys = this.data.keys;
+    const total = keys.length;
+    const revoked_count = keys.filter(k => k.revoked).length;
+    const activated = keys.filter(k => k.device_id && k.approved === 1 && !k.revoked).length;
+    const available = keys.filter(k => !k.device_id && !k.revoked).length;
+    const pending = keys.filter(k => k.device_id && k.approved === 0 && !k.revoked).length;
+    const today = new Date().toISOString().slice(0, 10);
+    const active_today = keys.filter(k =>
+      k.last_used && k.last_used.startsWith(today) && !k.revoked
+    ).length;
+    return { total, revoked_count, activated, available, pending, active_today };
   }
 
-  close() {
-    this.db.close();
-  }
+  close() { }
 }
 
 module.exports = LicenseDatabase;
