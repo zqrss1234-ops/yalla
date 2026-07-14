@@ -114,7 +114,7 @@ app.post('/api/validate', (req, res) => {
 
   if (existingAct) {
     if (existingAct.status === 'approved') {
-      return res.json({ valid: false, message: 'رمز التفعيل مستخدم من قبل لهذا الجهاز' });
+      return res.json({ valid: true, message: '✓ تم التفعيل بنجاح' });
     }
     if (existingAct.status === 'rejected') {
       return res.json({ valid: false, message: 'تم رفض طلب التفعيل من المطور' });

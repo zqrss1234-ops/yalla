@@ -14,10 +14,35 @@ class LicenseDatabase {
         this.data = JSON.parse(fs.readFileSync(this.dbPath, 'utf8'));
       }
     } catch { }
+    this.migrateOldKeys();
   }
 
   save() {
     try { fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8'); } catch { }
+  }
+
+  migrateOldKeys() {
+    let count = 0;
+    for (const k of this.data.keys) {
+      if (k.device_id && (!k.activations || k.activations.length === 0)) {
+        k.activations = [{
+          device_id: k.device_id,
+          device_name: k.device_name || null,
+          device_model: k.device_model || null,
+          ios_version: k.ios_version || null,
+          bundle_id: k.bundle_id || null,
+          status: k.approved === 1 ? 'approved' : (k.approved === -1 ? 'rejected' : 'pending'),
+          requested_at: k.created_at || new Date().toISOString(),
+          approved_at: k.activated_at || null
+        }];
+        delete k.device_id; delete k.device_name; delete k.device_model;
+        delete k.ios_version; delete k.bundle_id; delete k.approved;
+        delete k.revoked; delete k.activated_at; delete k.last_used;
+        count++;
+      }
+      if (!k.activations) k.activations = [];
+    }
+    if (count) this.save();
   }
 
   addKey(key) {
@@ -37,7 +62,8 @@ class LicenseDatabase {
   addActivation(key, deviceId, deviceName, deviceModel, iosVersion, bundleId) {
     const k = this.findKey(key);
     if (!k) return null;
-    const existing = k.activations.find(a => a.device_id === deviceId);
+    if (!k.activations) k.activations = [];
+    const existing = (k.activations || []).find(a => a.device_id === deviceId);
     if (existing) return existing;
 
     const act = {
@@ -58,13 +84,13 @@ class LicenseDatabase {
   findActivation(key, deviceId) {
     const k = this.findKey(key);
     if (!k) return null;
-    return k.activations.find(a => a.device_id === deviceId) || null;
+    return (k.activations || []).find(a => a.device_id === deviceId) || null;
   }
 
   approveDevice(key, deviceId) {
     const k = this.findKey(key);
     if (!k) return false;
-    const act = k.activations.find(a => a.device_id === deviceId);
+    const act = (k.activations || []).find(a => a.device_id === deviceId);
     if (!act) return false;
     act.status = 'approved';
     act.approved_at = new Date().toISOString();
@@ -75,7 +101,7 @@ class LicenseDatabase {
   rejectDevice(key, deviceId) {
     const k = this.findKey(key);
     if (!k) return false;
-    const act = k.activations.find(a => a.device_id === deviceId);
+    const act = (k.activations || []).find(a => a.device_id === deviceId);
     if (!act) return false;
     act.status = 'rejected';
     this.save();
@@ -85,7 +111,7 @@ class LicenseDatabase {
   getPendingActivations() {
     const pending = [];
     for (const k of this.data.keys) {
-      for (const a of k.activations) {
+      for (const a of (k.activations || [])) {
         if (a.status === 'pending') {
           pending.push({ key: k.key, ...a });
         }
@@ -97,13 +123,13 @@ class LicenseDatabase {
   getActivationCount(key) {
     const k = this.findKey(key);
     if (!k) return 0;
-    return k.activations.filter(a => a.status === 'approved').length;
+    return (k.activations || []).filter(a => a.status === 'approved').length;
   }
 
   revokeDevice(key, deviceId) {
     const k = this.findKey(key);
     if (!k) return false;
-    const act = k.activations.find(a => a.device_id === deviceId);
+    const act = (k.activations || []).find(a => a.device_id === deviceId);
     if (!act) return false;
     act.status = 'rejected';
     this.save();
@@ -125,7 +151,7 @@ class LicenseDatabase {
     const keys = this.data.keys;
     let totalActs = 0, approvedActs = 0, pendingActs = 0, rejectedActs = 0;
     for (const k of keys) {
-      for (const a of k.activations) {
+      for (const a of (k.activations || [])) {
         totalActs++;
         if (a.status === 'approved') approvedActs++;
         else if (a.status === 'pending') pendingActs++;
@@ -134,7 +160,7 @@ class LicenseDatabase {
     }
     const today = new Date().toISOString().slice(0, 10);
     const activeToday = keys.reduce((sum, k) =>
-      sum + k.activations.filter(a =>
+      sum + (k.activations || []).filter(a =>
         a.status === 'approved' && a.approved_at && a.approved_at.startsWith(today)
       ).length, 0
     );
