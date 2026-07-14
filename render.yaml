@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: license-server
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ADMIN_SECRET
+        value: your-secret-key-change-this
+      - key: PORT
+        value: 3000

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMpossible - لوحة التحكم</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Tahoma', sans-serif;
+    background: #0a0a12;
+    color: #e0e0e0;
+    min-height: 100vh;
+  }
+
+  .login-page {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 20px;
+    background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a12 70%);
+  }
+  .login-box {
+    background: #12121e; padding: 40px; border-radius: 20px;
+    width: 100%; max-width: 400px; border: 1px solid #2a2a4a;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .login-box .logo { text-align: center; font-size: 42px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(135deg, #ff416c, #ff4b2b); -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent; margin-bottom: 4px; }
+  .login-box .sub { text-align: center; color: #666; margin-bottom: 28px; font-size: 13px; letter-spacing: 2px; }
+  .login-box input {
+    width: 100%; padding: 14px 16px; border-radius: 12px;
+    border: 1px solid #2a2a4a; background: #0a0a12; color: #fff;
+    font-size: 16px; margin-bottom: 16px; direction: ltr; text-align: center;
+  }
+  .login-box input:focus { outline: none; border-color: #ff416c; }
+  .login-box button {
+    width: 100%; padding: 14px; border-radius: 12px; border: none;
+    background: linear-gradient(135deg, #ff416c, #ff4b2b); color: #fff;
+    font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity 0.2s;
+  }
+  .login-box button:hover { opacity: 0.9; }
+  .login-error { color: #ff416c; text-align: center; margin-top: 12px; font-size: 14px; display: none; }
+
+  .dashboard { display: none; padding: 20px; max-width: 1500px; margin: 0 auto; }
+
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 0; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+  }
+  .header .logo-small { font-size: 20px; font-weight: 900; letter-spacing: 3px;
+    background: linear-gradient(135deg, #ff416c, #ff4b2b); -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent; }
+  .header .server-url { color: #555; font-size: 12px; direction: ltr; text-align: left; }
+  .header .logout-btn {
+    padding: 8px 20px; border-radius: 8px; border: 1px solid #2a2a4a;
+    background: transparent; color: #ff416c; cursor: pointer; font-size: 14px;
+  }
+
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+  }
+  .stat-card {
+    background: #12121e; border: 1px solid #2a2a4a; border-radius: 14px;
+    padding: 18px; text-align: center; position: relative; overflow: hidden;
+  }
+  .stat-card .num { font-size: 30px; font-weight: 800; }
+  .stat-card .label { font-size: 12px; color: #666; margin-top: 4px; }
+  .stat-card.pending {
+    border-color: #ff416c; animation: pulse-border 1.5s ease-in-out infinite;
+    cursor: pointer;
+  }
+  .stat-card.pending .num { color: #ff416c; }
+  .stat-card.pending .label { color: #ff416c; }
+  .stat-card.total .num { color: #6c5ce7; }
+  .stat-card.activated .num { color: #00d68f; }
+  .stat-card.available .num { color: #ffa940; }
+  .stat-card.revoked .num { color: #666; }
+  .stat-card.today .num { color: #40a9ff; }
+  @keyframes pulse-border {
+    0%, 100% { border-color: #ff416c; box-shadow: 0 0 0 0 rgba(255,65,108,0.3); }
+    50% { border-color: #ff4b2b; box-shadow: 0 0 20px 4px rgba(255,65,108,0.15); }
+  }
+
+  .pending-alert {
+    background: linear-gradient(135deg, rgba(255,65,108,0.1), rgba(255,75,43,0.05));
+    border: 1px solid #ff416c; border-radius: 14px; padding: 16px 20px;
+    margin-bottom: 20px; display: none; align-items: center; gap: 12px;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .pending-alert:hover { background: linear-gradient(135deg, rgba(255,65,108,0.15), rgba(255,75,43,0.1)); }
+  .pending-alert .icon { font-size: 24px; }
+  .pending-alert .text { flex: 1; }
+  .pending-alert .text strong { font-size: 16px; }
+  .pending-alert .text span { font-size: 13px; color: #888; }
+  .pending-alert .count { font-size: 28px; font-weight: 900; color: #ff416c; }
+
+  .actions-bar {
+    display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .actions-bar button {
+    padding: 10px 20px; border-radius: 10px; border: none;
+    font-size: 14px; cursor: pointer; font-weight: 600;
+  }
+  .btn-generate { background: linear-gradient(135deg, #ff416c, #ff4b2b); color: #fff; }
+  .btn-generate:hover { opacity: 0.9; }
+  .btn-refresh { background: #12121e; color: #e0e0e0; border: 1px solid #2a2a4a; }
+  .btn-refresh:hover { background: #1e1e32; }
+
+  .generate-section {
+    background: #12121e; border: 1px solid #2a2a4a; border-radius: 14px;
+    padding: 20px; margin-bottom: 20px; display: none;
+  }
+  .generate-section h3 { margin-bottom: 12px; font-size: 15px; color: #ff416c; }
+  .generate-section .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .generate-section input {
+    padding: 10px 14px; border-radius: 8px; border: 1px solid #2a2a4a;
+    background: #0a0a12; color: #fff; font-size: 14px; width: 80px; text-align: center;
+  }
+  .generate-section .btn-confirm {
+    padding: 10px 24px; border-radius: 8px; border: none;
+    background: #00d68f; color: #000; font-weight: 600; cursor: pointer;
+  }
+  .generate-section .btn-cancel {
+    padding: 10px 24px; border-radius: 8px; border: 1px solid #2a2a4a;
+    background: transparent; color: #888; cursor: pointer;
+  }
+  .generate-result {
+    margin-top: 12px; padding: 12px; background: #0a0a12; border-radius: 8px;
+    direction: ltr; font-family: monospace; font-size: 13px;
+    word-break: break-all; display: none; border: 1px solid #00d68f;
+  }
+
+  .table-wrap {
+    background: #12121e; border: 1px solid #2a2a4a; border-radius: 14px;
+    overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    padding: 12px 16px; text-align: center; background: #0a0a12;
+    color: #555; font-weight: 500; white-space: nowrap;
+    border-bottom: 1px solid #2a2a4a; font-size: 12px; letter-spacing: 1px;
+  }
+  td {
+    padding: 12px 16px; text-align: center; border-bottom: 1px solid #2a2a4a;
+    white-space: nowrap;
+  }
+  tr:hover td { background: rgba(255,65,108,0.03); }
+  tr.pending-row td { background: rgba(255,65,108,0.05); }
+  tr.pending-row:hover td { background: rgba(255,65,108,0.1); }
+  .key-cell { font-family: monospace; direction: ltr; color: #6c5ce7; font-weight: 600; font-size: 14px; }
+  .status-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+  }
+  .status-available { background: rgba(255,169,64,0.12); color: #ffa940; }
+  .status-activated { background: rgba(0,214,143,0.12); color: #00d68f; }
+  .status-revoked { background: rgba(102,102,102,0.12); color: #666; }
+  .status-pending {
+    background: rgba(255,65,108,0.15); color: #ff416c;
+    animation: pulse-text 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse-text {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  .device-info { font-size: 11px; color: #555; }
+  .device-info strong { color: #e0e0e0; }
+  .action-btn {
+    padding: 6px 14px; border-radius: 6px; border: none; font-size: 11px;
+    cursor: pointer; font-weight: 600; transition: opacity 0.2s;
+  }
+  .action-btn:hover { opacity: 0.8; }
+  .action-approve { background: rgba(0,214,143,0.15); color: #00d68f; }
+  .action-approve:hover { background: rgba(0,214,143,0.3); }
+  .action-reject { background: rgba(255,65,108,0.15); color: #ff416c; }
+  .action-reject:hover { background: rgba(255,65,108,0.3); }
+  .action-revoke { background: rgba(255,169,64,0.12); color: #ffa940; }
+  .action-revoke:hover { background: rgba(255,169,64,0.25); }
+  .action-unrevoke { background: rgba(0,214,143,0.12); color: #00d68f; }
+  .action-delete { background: rgba(255,65,108,0.08); color: #ff416c; }
+  .action-delete:hover { background: rgba(255,65,108,0.2); }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; padding: 14px 24px;
+    border-radius: 12px; background: #12121e; border: 1px solid #2a2a4a;
+    color: #e0e0e0; font-size: 14px; display: none; z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6); direction: ltr;
+  }
+  .toast.success { border-color: #00d68f; }
+  .toast.error { border-color: #ff416c; }
+
+  .search-box {
+    padding: 10px 14px; border-radius: 8px; border: 1px solid #2a2a4a;
+    background: #0a0a12; color: #fff; font-size: 13px; min-width: 200px;
+  }
+  .search-box:focus { outline: none; border-color: #ff416c; }
+
+  @media (max-width: 768px) {
+    .dashboard { padding: 12px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    th, td { padding: 8px 8px; font-size: 11px; }
+    .header .logo-small { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="login-page" id="loginPage">
+  <div class="login-box">
+    <div class="logo">IMpossible</div>
+    <div class="sub">ACTIVATION SYSTEM</div>
+    <input type="password" id="loginPassword" placeholder="كلمة السر" autocomplete="off">
+    <button onclick="login()">تسجيل الدخول</button>
+    <div class="login-error" id="loginError">كلمة السر خطأ</div>
+  </div>
+</div>
+
+<div class="dashboard" id="dashboard">
+  <div class="header">
+    <div>
+      <div class="logo-small">IMpossible</div>
+      <div class="server-url" id="serverUrl"></div>
+    </div>
+    <button class="logout-btn" onclick="logout()">تسجيل خروج</button>
+  </div>
+
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <div class="pending-alert" id="pendingAlert" onclick="scrollToPending()">
+    <div class="icon">⚠️</div>
+    <div class="text">
+      <strong>طلبات موافقة جديدة</strong><br>
+      <span>اضغط لعرض الأجهزة التي تنتظر موافقتك</span>
+    </div>
+    <div class="count" id="pendingCountBadge">0</div>
+  </div>
+
+  <div class="actions-bar">
+    <button class="btn-generate" onclick="toggleGenerate()">+ إنشاء أكواد</button>
+    <button class="btn-refresh" onclick="manualRefresh()">🔄 تحديث</button>
+    <input type="text" class="search-box" id="searchBox" placeholder="🔍 بحث..." oninput="filterTable()">
+  </div>
+
+  <div class="generate-section" id="generateSection">
+    <h3>⚠️ إنشاء أكواد تفعيل جديدة</h3>
+    <div class="row">
+      <span>العدد:</span>
+      <input type="number" id="keyCount" value="5" min="1" max="100">
+      <button class="btn-confirm" onclick="generateKeys()">تأكيد</button>
+      <button class="btn-cancel" onclick="toggleGenerate()">إلغاء</button>
+    </div>
+    <div class="generate-result" id="generateResult"></div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>رمز التفعيل</th>
+          <th>الحالة</th>
+          <th>الجهاز</th>
+          <th>النظام</th>
+          <th>البundle</th>
+          <th>تاريخ الإنشاء</th>
+          <th>تاريخ التفعيل</th>
+          <th>آخر استخدام</th>
+          <th>تحكم</th>
+        </tr>
+      </thead>
+      <tbody id="keysTableBody">
+        <tr><td colspan="9" style="text-align:center;padding:40px;color:#333;">جاري التحميل...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let token = localStorage.getItem('license_token');
+let allKeys = [];
+let prevPendingCount = 0;
+let pollInterval = null;
+
+const API = window.location.origin;
+
+document.getElementById('loginPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') login();
+});
+document.getElementById('keyCount').addEventListener('keydown', e => {
+  if (e.key === 'Enter') generateKeys();
+});
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 4000);
+}
+
+async function api(path, body) {
+  const res = await fetch(API + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+function login() {
+  const pw = document.getElementById('loginPassword').value;
+  fetch(API + '/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: pw })
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      token = data.token;
+      localStorage.setItem('license_token', token);
+      document.getElementById('loginError').style.display = 'none';
+      showDashboard();
+    } else {
+      document.getElementById('loginError').style.display = 'block';
+    }
+  }).catch(() => {
+    document.getElementById('loginError').textContent = 'فشل الاتصال بالسيرفر';
+    document.getElementById('loginError').style.display = 'block';
+  });
+}
+
+function logout() {
+  token = null;
+  localStorage.removeItem('license_token');
+  if (pollInterval) clearInterval(pollInterval);
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('loginPassword').value = '';
+}
+
+function showDashboard() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('serverUrl').textContent = '🌐 ' + API;
+  loadKeys();
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(loadKeys, 5000);
+}
+
+let isLoading = false;
+async function loadKeys() {
+  if (isLoading) return;
+  isLoading = true;
+  try {
+    const data = await api('/api/admin/keys', { token });
+    if (data.error) { logout(); return; }
+    allKeys = data.keys || [];
+    renderStats(data.stats);
+    renderTable(allKeys);
+    checkPending(data.pendingCount);
+  } finally {
+    isLoading = false;
+  }
+}
+
+function checkPending(count) {
+  const badge = document.getElementById('pendingCountBadge');
+  const alert = document.getElementById('pendingAlert');
+  badge.textContent = count;
+  if (count > 0) {
+    alert.style.display = 'flex';
+    if (count > prevPendingCount) {
+      showToast('⚠️ جهاز جديد ينتظر موافقتك! (' + count + ')', 'error');
+    }
+  } else {
+    alert.style.display = 'none';
+  }
+  prevPendingCount = count;
+}
+
+function manualRefresh() {
+  prevPendingCount = 0;
+  loadKeys();
+  showToast('🔄 تم التحديث', 'success');
+}
+
+function renderStats(stats) {
+  if (!stats) return;
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card pending" onclick="scrollToPending()">
+      <div class="num">${stats.pending}</div>
+      <div class="label">بانتظار الموافقة</div>
+    </div>
+    <div class="stat-card total"><div class="num">${stats.total}</div><div class="label">إجمالي الأكواد</div></div>
+    <div class="stat-card activated"><div class="num">${stats.activated}</div><div class="label">نشطة</div></div>
+    <div class="stat-card available"><div class="num">${stats.available}</div><div class="label">غير مستخدمة</div></div>
+    <div class="stat-card revoked"><div class="num">${stats.revoked_count}</div><div class="label">ملغية</div></div>
+    <div class="stat-card today"><div class="num">${stats.active_today}</div><div class="label">مستخدمة اليوم</div></div>
+  `;
+}
+
+function renderTable(keys) {
+  const tbody = document.getElementById('keysTableBody');
+  if (keys.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#333;">لا توجد أكواد بعد</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = keys.map(k => {
+    const isPending = k.device_id && k.approved === 0 && !k.revoked;
+    const isApproved = k.approved === 1 && !k.revoked;
+    const isRejected = k.approved === -1 && !k.revoked;
+
+    let status, statusText, statusClass;
+    if (k.revoked) {
+      status = 'revoked'; statusText = 'ملغي'; statusClass = 'status-revoked';
+    } else if (isPending) {
+      status = 'pending'; statusText = 'بانتظار الموافقة'; statusClass = 'status-pending';
+    } else if (isApproved) {
+      status = 'activated'; statusText = 'مفعل'; statusClass = 'status-activated';
+    } else if (isRejected) {
+      status = 'revoked'; statusText = 'مرفوض'; statusClass = 'status-revoked';
+    } else {
+      status = 'available'; statusText = 'متاح'; statusClass = 'status-available';
+    }
+
+    const rowClass = isPending ? 'pending-row' : '';
+
+    const deviceInfo = k.device_name ? `<strong>${k.device_name}</strong>` : (k.device_id ? k.device_id.substring(0, 8) + '...' : '—');
+    const deviceDetail = k.device_model || '';
+    const iosVer = k.ios_version || '—';
+    const bundle = k.bundle_id || '—';
+    const created = k.created_at ? new Date(k.created_at + 'Z').toLocaleString('ar-SA') : '—';
+    const activated = k.activated_at ? new Date(k.activated_at + 'Z').toLocaleString('ar-SA') : '—';
+    const lastUsed = k.last_used ? new Date(k.last_used + 'Z').toLocaleString('ar-SA') : '—';
+
+    let actionBtn = '';
+    if (isPending) {
+      actionBtn = `
+        <button class="action-btn action-approve" onclick="approveKey('${k.key}')">✅ موافقة</button>
+        <button class="action-btn action-reject" onclick="rejectKey('${k.key}')">❌ رفض</button>
+      `;
+    } else if (k.revoked) {
+      actionBtn = `<button class="action-btn action-unrevoke" onclick="unrevokeKey('${k.key}')">إعادة تفعيل</button>`;
+    } else if (isApproved) {
+      actionBtn = `<button class="action-btn action-revoke" onclick="revokeKey('${k.key}')">إلغاء</button>`;
+    } else {
+      actionBtn = `<button class="action-btn action-revoke" onclick="revokeKey('${k.key}')">إلغاء</button>`;
+    }
+    actionBtn += ` <button class="action-btn action-delete" onclick="deleteKey('${k.key}')">حذف</button>`;
+
+    return `<tr class="${rowClass}">
+      <td class="key-cell">${k.key}</td>
+      <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+      <td><div class="device-info">${deviceInfo}${deviceDetail ? '<br>' + deviceDetail : ''}</div></td>
+      <td class="device-info">${iosVer}</td>
+      <td class="device-info">${bundle}</td>
+      <td class="device-info">${created}</td>
+      <td class="device-info">${activated}</td>
+      <td class="device-info">${lastUsed}</td>
+      <td style="white-space:nowrap">${actionBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+function scrollToPending() {
+  const rows = document.querySelectorAll('.pending-row');
+  if (rows.length > 0) rows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function filterTable() {
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  if (!q) { renderTable(allKeys); return; }
+  const filtered = allKeys.filter(k =>
+    k.key.toLowerCase().includes(q) ||
+    (k.device_name && k.device_name.toLowerCase().includes(q)) ||
+    (k.device_id && k.device_id.toLowerCase().includes(q)) ||
+    (k.bundle_id && k.bundle_id.toLowerCase().includes(q)) ||
+    (k.device_model && k.device_model.toLowerCase().includes(q))
+  );
+  renderTable(filtered);
+}
+
+function toggleGenerate() {
+  const el = document.getElementById('generateSection');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('generateResult').style.display = 'none';
+  if (el.style.display === 'block') document.getElementById('keyCount').focus();
+}
+
+async function generateKeys() {
+  const count = parseInt(document.getElementById('keyCount').value) || 1;
+  const data = await api('/api/admin/generate', { token, count });
+  if (data.error) { showToast('Unauthorized', 'error'); return; }
+  const resultEl = document.getElementById('generateResult');
+  resultEl.innerHTML = '✅ تم إنشاء ' + data.keys.length + ' كود:<br>' + data.keys.join('<br>');
+  resultEl.style.display = 'block';
+  manualRefresh();
+}
+
+async function approveKey(key) {
+  await api('/api/admin/approve', { token, key });
+  showToast('✅ تمت الموافقة على ' + key, 'success');
+  manualRefresh();
+}
+
+async function rejectKey(key) {
+  if (!confirm('رفض الكود ' + key + '؟')) return;
+  await api('/api/admin/reject', { token, key });
+  showToast('❌ تم رفض ' + key, 'error');
+  manualRefresh();
+}
+
+async function revokeKey(key) {
+  if (!confirm('إلغاء الكود ' + key + '؟')) return;
+  await api('/api/admin/revoke', { token, key });
+  showToast('⚠️ تم إلغاء ' + key, 'success');
+  manualRefresh();
+}
+
+async function unrevokeKey(key) {
+  await api('/api/admin/unrevoke', { token, key });
+  showToast('✅ تم إعادة تفعيل ' + key, 'success');
+  manualRefresh();
+}
+
+async function deleteKey(key) {
+  if (!confirm('حذف الكود ' + key + ' بشكل نهائي؟')) return;
+  await api('/api/admin/delete', { token, key });
+  showToast('🗑️ تم حذف ' + key, 'success');
+  manualRefresh();
+}
+
+if (token) { showDashboard(); }
+</script>
+</body>
+</html>
