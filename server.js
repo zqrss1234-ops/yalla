@@ -48,8 +48,8 @@ app.post('/api/admin/generate', (req, res) => {
   res.json({ keys });
 });
 
-app.get('/api/admin/keys', (req, res) => {
-  const token = req.query.token;
+app.post('/api/admin/keys', (req, res) => {
+  const { token } = req.body;
   if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
 
   const keys = db.getAllKeys();
