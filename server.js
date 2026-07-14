@@ -4,7 +4,13 @@ const path = require('path');
 const Database = require('./database');
 
 const app = express();
-const db = new Database(process.env.DB_PATH);
+const github = {
+  owner: 'zqrss1234-ops',
+  repo: 'yalla',
+  path: 'licenses.json',
+  token: process.env.GH_TOKEN || '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'
+};
+const db = new Database(process.env.DB_PATH, github);
 
 app.use(cors());
 app.use(express.json());

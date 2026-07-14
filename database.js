@@ -1,10 +1,13 @@
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 class LicenseDatabase {
-  constructor(dbPath) {
+  constructor(dbPath, github) {
     this.dbPath = dbPath || path.join(__dirname, 'licenses.json');
+    this.github = github || null;
     this.data = { keys: [], nextId: 1 };
+    this._pendingSave = false;
     const dir = path.dirname(this.dbPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     this.load();
@@ -13,14 +16,42 @@ class LicenseDatabase {
   load() {
     try {
       if (fs.existsSync(this.dbPath)) {
-        this.data = JSON.parse(fs.readFileSync(this.dbPath, 'utf8'));
+        const raw = fs.readFileSync(this.dbPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed.keys && Array.isArray(parsed.keys)) {
+          this.data = parsed;
+          this.migrateOldKeys();
+          return;
+        }
       }
     } catch { }
-    this.migrateOldKeys();
+
+    if (this.github) {
+      try {
+        const raw = this._githubLoad();
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.keys && Array.isArray(parsed.keys)) {
+            this.data = parsed;
+            fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
+            this.migrateOldKeys();
+            return;
+          }
+        }
+      } catch { }
+    }
+
+    this.data = { keys: [], nextId: 1 };
   }
 
   save() {
-    try { fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8'); } catch { }
+    try {
+      fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
+    } catch { }
+    if (this.github && !this._pendingSave) {
+      this._pendingSave = true;
+      this._githubSave(JSON.stringify(this.data, null, 2));
+    }
   }
 
   migrateOldKeys() {
@@ -45,6 +76,81 @@ class LicenseDatabase {
       if (!k.activations) k.activations = [];
     }
     if (count) this.save();
+  }
+
+  _githubLoad() {
+    return new Promise((resolve, reject) => {
+      const opts = {
+        hostname: 'api.github.com',
+        path: `/repos/${this.github.owner}/${this.github.repo}/contents/${this.github.path}`,
+        headers: {
+          'User-Agent': 'license-server',
+          'Authorization': `token ${this.github.token}`,
+          'Accept': 'application/vnd.github.v3.raw'
+        }
+      };
+      https.get(opts, res => {
+        if (res.statusCode === 200) {
+          let body = '';
+          res.on('data', c => body += c);
+          res.on('end', () => resolve(body));
+        } else {
+          reject(new Error(`GitHub load status ${res.statusCode}`));
+        }
+      }).on('error', reject);
+    });
+  }
+
+  _githubSave(content) {
+    const gh = this.github;
+    const getSha = () => new Promise((resolve, reject) => {
+      const opts = {
+        hostname: 'api.github.com',
+        path: `/repos/${gh.owner}/${gh.repo}/contents/${gh.path}`,
+        method: 'GET',
+        headers: {
+          'User-Agent': 'license-server',
+          'Authorization': `token ${gh.token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      };
+      const req = https.request(opts, res => {
+        let body = '';
+        res.on('data', c => body += c);
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(body);
+            resolve(json.sha || null);
+          } catch { resolve(null); }
+        });
+      });
+      req.on('error', () => resolve(null));
+      req.end();
+    });
+
+    getSha().then(sha => {
+      const putOpts = {
+        hostname: 'api.github.com',
+        path: `/repos/${gh.owner}/${gh.repo}/contents/${gh.path}`,
+        method: 'PUT',
+        headers: {
+          'User-Agent': 'license-server',
+          'Authorization': `token ${gh.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        }
+      };
+      const body = JSON.stringify({
+        message: 'auto-save licenses',
+        content: Buffer.from(content).toString('base64'),
+        sha: sha || undefined
+      });
+      const req = https.request(putOpts);
+      req.on('error', () => {});
+      req.on('close', () => { this._pendingSave = false; });
+      req.write(body);
+      req.end();
+    }).catch(() => { this._pendingSave = false; });
   }
 
   addKey(key) {
