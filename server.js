@@ -4,7 +4,7 @@ const path = require('path');
 const Database = require('./database');
 
 const app = express();
-const db = new Database();
+const db = new Database(process.env.DB_PATH);
 
 app.use(cors());
 app.use(express.json());

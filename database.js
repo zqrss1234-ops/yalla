@@ -5,6 +5,8 @@ class LicenseDatabase {
   constructor(dbPath) {
     this.dbPath = dbPath || path.join(__dirname, 'licenses.json');
     this.data = { keys: [], nextId: 1 };
+    const dir = path.dirname(this.dbPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     this.load();
   }
 
