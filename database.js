@@ -108,6 +108,14 @@ class LicenseDatabase {
     return true;
   }
 
+  findAnyActivationByDevice(deviceId) {
+    for (const k of this.data.keys) {
+      const act = (k.activations || []).find(a => a.device_id === deviceId);
+      if (act) return { key: k.key, activation: act };
+    }
+    return null;
+  }
+
   getPendingActivations() {
     const pending = [];
     for (const k of this.data.keys) {

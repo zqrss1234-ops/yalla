@@ -110,21 +110,26 @@ app.post('/api/validate', (req, res) => {
     return res.json({ valid: false, message: 'رمز التفعيل غير صالح' });
   }
 
-  const existingAct = db.findActivation(key, deviceId);
+  const deviceBinding = db.findAnyActivationByDevice(deviceId);
 
-  if (existingAct) {
-    if (existingAct.status === 'approved') {
-      return res.json({ valid: true, message: '✓ تم التفعيل بنجاح' });
+  if (deviceBinding) {
+    if (deviceBinding.key === key) {
+      // Same code + same device
+      const act = deviceBinding.activation;
+      if (act.status === 'approved') {
+        return res.json({ valid: true, message: '✓ تم التفعيل بنجاح' });
+      }
+      if (act.status === 'rejected') {
+        return res.json({ valid: false, message: 'تم رفض طلب التفعيل من المطور' });
+      }
+      return res.json({ valid: false, needsApproval: true, message: 'بانتظار موافقة المطور' });
     }
-    if (existingAct.status === 'rejected') {
-      return res.json({ valid: false, message: 'تم رفض طلب التفعيل من المطور' });
-    }
-    // pending
-    return res.json({
-      valid: false,
-      needsApproval: true,
-      message: 'بانتظار موافقة المطور'
-    });
+
+    // Device already has a DIFFERENT code
+    const msg = deviceBinding.activation.status === 'approved'
+      ? 'هذا الجهاز لديه رمز تفعيل نشط بالفعل'
+      : 'هذا الجهاز لديه طلب تفعيل معلق بالفعل';
+    return res.json({ valid: false, message: msg });
   }
 
   db.addActivation(key, deviceId, deviceName, deviceModel, iosVersion, bundleId || 'unknown');
