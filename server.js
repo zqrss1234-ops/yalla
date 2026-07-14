@@ -13,16 +13,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'impossible';
 
 function generateLicenseKey() {
-  const segments = [];
+  const segs = [];
   for (let i = 0; i < 4; i++) {
-    let seg = '';
+    let s = '';
     for (let j = 0; j < 4; j++) {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      seg += chars[Math.floor(Math.random() * chars.length)];
+      s += 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)];
     }
-    segments.push(seg);
+    segs.push(s);
   }
-  return segments.join('-');
+  return segs.join('-');
 }
 
 app.post('/api/login', (req, res) => {
@@ -37,7 +36,6 @@ app.post('/api/login', (req, res) => {
 app.post('/api/admin/generate', (req, res) => {
   const { token, count } = req.body;
   if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
-
   const numKeys = Math.min(count || 1, 100);
   const keys = [];
   for (let i = 0; i < numKeys; i++) {
@@ -51,38 +49,46 @@ app.post('/api/admin/generate', (req, res) => {
 app.post('/api/admin/keys', (req, res) => {
   const { token } = req.body;
   if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
-
   const keys = db.getAllKeys();
   const stats = db.getStats();
-  const pendingCount = db.getPendingCount();
+  const pendingCount = db.getPendingActivations().length;
   res.json({ keys, stats, pendingCount });
 });
 
 app.post('/api/admin/approve', (req, res) => {
-  const { token, key } = req.body;
+  const { token, key, deviceId } = req.body;
   if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
-  db.approveKey(key);
+  if (deviceId) {
+    db.approveDevice(key, deviceId);
+  } else {
+    const k = db.findKey(key);
+    if (k) {
+      k.activations.filter(a => a.status === 'pending').forEach(a => db.approveDevice(key, a.device_id));
+    }
+  }
   res.json({ success: true });
 });
 
 app.post('/api/admin/reject', (req, res) => {
-  const { token, key } = req.body;
+  const { token, key, deviceId } = req.body;
   if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
-  db.rejectKey(key);
+  if (deviceId) {
+    db.rejectDevice(key, deviceId);
+  }
   res.json({ success: true });
 });
 
 app.post('/api/admin/revoke', (req, res) => {
-  const { token, key } = req.body;
+  const { token, key, deviceId } = req.body;
   if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
-  db.revokeKey(key);
-  res.json({ success: true });
-});
-
-app.post('/api/admin/unrevoke', (req, res) => {
-  const { token, key } = req.body;
-  if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
-  db.unrevokeKey(key);
+  if (deviceId) {
+    db.revokeDevice(key, deviceId);
+  } else {
+    const k = db.findKey(key);
+    if (k) {
+      k.activations.filter(a => a.status === 'approved').forEach(a => db.revokeDevice(key, a.device_id));
+    }
+  }
   res.json({ success: true });
 });
 
@@ -95,56 +101,35 @@ app.post('/api/admin/delete', (req, res) => {
 
 app.post('/api/validate', (req, res) => {
   const { key, deviceId, deviceName, deviceModel, iosVersion, bundleId } = req.body;
-
   if (!key || !deviceId) {
-    return res.status(400).json({
-      valid: false,
-      message: 'Missing key or deviceId'
-    });
+    return res.status(400).json({ valid: false, message: 'Missing key or deviceId' });
   }
 
   const license = db.findKey(key);
   if (!license) {
+    return res.json({ valid: false, message: 'رمز التفعيل غير صالح' });
+  }
+
+  const existingAct = db.findActivation(key, deviceId);
+
+  if (existingAct) {
+    if (existingAct.status === 'approved') {
+      return res.json({ valid: false, message: 'رمز التفعيل مستخدم من قبل لهذا الجهاز' });
+    }
+    if (existingAct.status === 'rejected') {
+      return res.json({ valid: false, message: 'تم رفض طلب التفعيل من المطور' });
+    }
+    // pending
     return res.json({
       valid: false,
-      message: 'رمز التفعيل غير صالح'
+      needsApproval: true,
+      message: 'بانتظار موافقة المطور'
     });
   }
 
-  if (license.revoked) {
-    return res.json({
-      valid: false,
-      message: 'تم إلغاء رمز التفعيل هذا'
-    });
-  }
+  db.addActivation(key, deviceId, deviceName, deviceModel, iosVersion, bundleId || 'unknown');
 
-  if (license.device_id && license.device_id !== deviceId) {
-    return res.json({
-      valid: false,
-      message: 'رمز التفعيل مستخدم على جهاز آخر'
-    });
-  }
-
-  if (!license.device_id) {
-    db.addDeviceInfo(key, deviceId, deviceName, deviceModel, iosVersion, bundleId || 'unknown');
-  }
-
-  if (license.approved === 1) {
-    db.logUsage(key);
-    return res.json({
-      valid: true,
-      message: 'تم التحقق بنجاح'
-    });
-  }
-
-  if (license.approved === -1) {
-    return res.json({
-      valid: false,
-      message: 'تم رفض طلب التفعيل من المطور'
-    });
-  }
-
-  return res.json({
+  res.json({
     valid: false,
     needsApproval: true,
     message: 'بانتظار موافقة المطور'
@@ -159,9 +144,7 @@ function verifyToken(token) {
   try {
     const data = JSON.parse(Buffer.from(token, 'base64').toString());
     return data.s === ADMIN_SECRET;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
 const PORT = process.env.PORT || 3000;

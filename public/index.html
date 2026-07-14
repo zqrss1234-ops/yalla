@@ -385,78 +385,96 @@ function manualRefresh() {
 
 function renderStats(stats) {
   if (!stats) return;
+  const totalDevices = stats.approved + stats.pending + stats.rejected;
   document.getElementById('statsGrid').innerHTML = `
     <div class="stat-card pending" onclick="scrollToPending()">
       <div class="num">${stats.pending}</div>
       <div class="label">بانتظار الموافقة</div>
     </div>
-    <div class="stat-card total"><div class="num">${stats.total}</div><div class="label">إجمالي الأكواد</div></div>
-    <div class="stat-card activated"><div class="num">${stats.activated}</div><div class="label">نشطة</div></div>
-    <div class="stat-card available"><div class="num">${stats.available}</div><div class="label">غير مستخدمة</div></div>
-    <div class="stat-card revoked"><div class="num">${stats.revoked_count}</div><div class="label">ملغية</div></div>
+    <div class="stat-card total"><div class="num">${stats.total_keys}</div><div class="label">إجمالي الأكواد</div></div>
+    <div class="stat-card activated"><div class="num">${stats.approved}</div><div class="label">مفعلة</div></div>
+    <div class="stat-card available"><div class="num">${stats.total_keys - totalDevices}</div><div class="label">غير مستخدمة</div></div>
+    <div class="stat-card revoked"><div class="num">${stats.rejected}</div><div class="label">مرفوضة</div></div>
     <div class="stat-card today"><div class="num">${stats.active_today}</div><div class="label">مستخدمة اليوم</div></div>
   `;
 }
 
 function renderTable(keys) {
   const tbody = document.getElementById('keysTableBody');
-  if (keys.length === 0) {
+  const rows = [];
+
+  for (const k of keys) {
+    const acts = k.activations || [];
+    if (acts.length === 0) {
+      rows.push({ key: k.key, created_at: k.created_at, status: 'available', isEmpty: true });
+    }
+    for (const a of acts) {
+      rows.push({
+        key: k.key,
+        created_at: k.created_at,
+        device_id: a.device_id,
+        device_name: a.device_name,
+        device_model: a.device_model,
+        ios_version: a.ios_version,
+        bundle_id: a.bundle_id,
+        status: a.status,
+        requested_at: a.requested_at,
+        approved_at: a.approved_at
+      });
+    }
+  }
+
+  if (rows.length === 0) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#333;">لا توجد أكواد بعد</td></tr>';
     return;
   }
 
-  tbody.innerHTML = keys.map(k => {
-    const isPending = k.device_id && k.approved === 0 && !k.revoked;
-    const isApproved = k.approved === 1 && !k.revoked;
-    const isRejected = k.approved === -1 && !k.revoked;
-
-    let status, statusText, statusClass;
-    if (k.revoked) {
-      status = 'revoked'; statusText = 'ملغي'; statusClass = 'status-revoked';
-    } else if (isPending) {
-      status = 'pending'; statusText = 'بانتظار الموافقة'; statusClass = 'status-pending';
-    } else if (isApproved) {
-      status = 'activated'; statusText = 'مفعل'; statusClass = 'status-activated';
-    } else if (isRejected) {
-      status = 'revoked'; statusText = 'مرفوض'; statusClass = 'status-revoked';
+  tbody.innerHTML = rows.map(r => {
+    let statusText, statusClass, rowClass;
+    if (r.isEmpty) {
+      statusText = 'متاح'; statusClass = 'status-available'; rowClass = '';
+    } else if (r.status === 'pending') {
+      statusText = 'بانتظار الموافقة'; statusClass = 'status-pending'; rowClass = 'pending-row';
+    } else if (r.status === 'approved') {
+      statusText = 'مفعل'; statusClass = 'status-activated'; rowClass = '';
+    } else if (r.status === 'rejected') {
+      statusText = 'مرفوض'; statusClass = 'status-revoked'; rowClass = '';
     } else {
-      status = 'available'; statusText = 'متاح'; statusClass = 'status-available';
+      statusText = r.status; statusClass = ''; rowClass = '';
     }
 
-    const rowClass = isPending ? 'pending-row' : '';
+    let deviceInfo = '—';
+    let deviceDetail = '';
+    if (r.device_name) { deviceInfo = `<strong>${r.device_name}</strong>`; deviceDetail = r.device_model || ''; }
+    else if (r.device_id) deviceInfo = r.device_id.substring(0, 12) + '...';
 
-    const deviceInfo = k.device_name ? `<strong>${k.device_name}</strong>` : (k.device_id ? k.device_id.substring(0, 8) + '...' : '—');
-    const deviceDetail = k.device_model || '';
-    const iosVer = k.ios_version || '—';
-    const bundle = k.bundle_id || '—';
-    const created = k.created_at ? new Date(k.created_at + 'Z').toLocaleString('ar-SA') : '—';
-    const activated = k.activated_at ? new Date(k.activated_at + 'Z').toLocaleString('ar-SA') : '—';
-    const lastUsed = k.last_used ? new Date(k.last_used + 'Z').toLocaleString('ar-SA') : '—';
+    const iosVer = r.ios_version || '—';
+    const bundle = r.bundle_id || '—';
+    const created = r.created_at ? new Date(r.created_at + 'Z').toLocaleString('ar-SA') : '—';
+    const activationTime = r.approved_at ? new Date(r.approved_at + 'Z').toLocaleString('ar-SA') : (r.requested_at ? new Date(r.requested_at + 'Z').toLocaleString('ar-SA') : '—');
 
     let actionBtn = '';
-    if (isPending) {
+    if (r.status === 'pending') {
       actionBtn = `
-        <button class="action-btn action-approve" onclick="approveKey('${k.key}')">✅ موافقة</button>
-        <button class="action-btn action-reject" onclick="rejectKey('${k.key}')">❌ رفض</button>
+        <button class="action-btn action-approve" onclick="approveDevice('${r.key}','${r.device_id}')">✅ موافقة</button>
+        <button class="action-btn action-reject" onclick="rejectDevice('${r.key}','${r.device_id}')">❌ رفض</button>
       `;
-    } else if (k.revoked) {
-      actionBtn = `<button class="action-btn action-unrevoke" onclick="unrevokeKey('${k.key}')">إعادة تفعيل</button>`;
-    } else if (isApproved) {
-      actionBtn = `<button class="action-btn action-revoke" onclick="revokeKey('${k.key}')">إلغاء</button>`;
-    } else {
-      actionBtn = `<button class="action-btn action-revoke" onclick="revokeKey('${k.key}')">إلغاء</button>`;
+    } else if (r.status === 'approved') {
+      actionBtn = `<button class="action-btn action-revoke" onclick="revokeDevice('${r.key}','${r.device_id}')">إلغاء</button>`;
     }
-    actionBtn += ` <button class="action-btn action-delete" onclick="deleteKey('${k.key}')">حذف</button>`;
+    if (r.isEmpty) {
+      actionBtn = `<button class="action-btn action-delete" onclick="deleteKey('${r.key}')">حذف</button>`;
+    }
 
     return `<tr class="${rowClass}">
-      <td class="key-cell">${k.key}</td>
+      <td class="key-cell">${r.key}</td>
       <td><span class="status-badge ${statusClass}">${statusText}</span></td>
       <td><div class="device-info">${deviceInfo}${deviceDetail ? '<br>' + deviceDetail : ''}</div></td>
       <td class="device-info">${iosVer}</td>
       <td class="device-info">${bundle}</td>
       <td class="device-info">${created}</td>
-      <td class="device-info">${activated}</td>
-      <td class="device-info">${lastUsed}</td>
+      <td class="device-info">${activationTime}</td>
+      <td class="device-info">${activationTime}</td>
       <td style="white-space:nowrap">${actionBtn}</td>
     </tr>`;
   }).join('');
@@ -470,14 +488,20 @@ function scrollToPending() {
 function filterTable() {
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
   if (!q) { renderTable(allKeys); return; }
-  const filtered = allKeys.filter(k =>
-    k.key.toLowerCase().includes(q) ||
-    (k.device_name && k.device_name.toLowerCase().includes(q)) ||
-    (k.device_id && k.device_id.toLowerCase().includes(q)) ||
-    (k.bundle_id && k.bundle_id.toLowerCase().includes(q)) ||
-    (k.device_model && k.device_model.toLowerCase().includes(q))
-  );
-  renderTable(filtered);
+
+  const rows = [];
+  for (const k of allKeys) {
+    for (const a of k.activations || []) {
+      const match = k.key.toLowerCase().includes(q) ||
+        (a.device_name && a.device_name.toLowerCase().includes(q)) ||
+        (a.device_id && a.device_id.toLowerCase().includes(q)) ||
+        (a.bundle_id && a.bundle_id.toLowerCase().includes(q)) ||
+        (a.device_model && a.device_model.toLowerCase().includes(q));
+      if (match) rows.push(k);
+    }
+  }
+  const unique = [...new Set(rows)];
+  renderTable(unique.length > 0 ? unique : allKeys.filter(k => k.key.toLowerCase().includes(q)));
 }
 
 function toggleGenerate() {
@@ -497,29 +521,23 @@ async function generateKeys() {
   manualRefresh();
 }
 
-async function approveKey(key) {
-  await api('/api/admin/approve', { token, key });
-  showToast('✅ تمت الموافقة على ' + key, 'success');
+async function approveDevice(key, deviceId) {
+  await api('/api/admin/approve', { token, key, deviceId });
+  showToast('✅ تمت الموافقة على الجهاز', 'success');
   manualRefresh();
 }
 
-async function rejectKey(key) {
-  if (!confirm('رفض الكود ' + key + '؟')) return;
-  await api('/api/admin/reject', { token, key });
-  showToast('❌ تم رفض ' + key, 'error');
+async function rejectDevice(key, deviceId) {
+  if (!confirm('رفض هذا الجهاز؟')) return;
+  await api('/api/admin/reject', { token, key, deviceId });
+  showToast('❌ تم رفض الجهاز', 'error');
   manualRefresh();
 }
 
-async function revokeKey(key) {
-  if (!confirm('إلغاء الكود ' + key + '؟')) return;
-  await api('/api/admin/revoke', { token, key });
-  showToast('⚠️ تم إلغاء ' + key, 'success');
-  manualRefresh();
-}
-
-async function unrevokeKey(key) {
-  await api('/api/admin/unrevoke', { token, key });
-  showToast('✅ تم إعادة تفعيل ' + key, 'success');
+async function revokeDevice(key, deviceId) {
+  if (!confirm('إلغاء هذا الجهاز؟')) return;
+  await api('/api/admin/revoke', { token, key, deviceId });
+  showToast('⚠️ تم إلغاء الجهاز', 'success');
   manualRefresh();
 }
 

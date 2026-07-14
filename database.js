@@ -11,32 +11,21 @@ class LicenseDatabase {
   load() {
     try {
       if (fs.existsSync(this.dbPath)) {
-        const raw = fs.readFileSync(this.dbPath, 'utf8');
-        this.data = JSON.parse(raw);
+        this.data = JSON.parse(fs.readFileSync(this.dbPath, 'utf8'));
       }
     } catch { }
   }
 
   save() {
-    try {
-      fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
-    } catch { }
+    try { fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8'); } catch { }
   }
 
   addKey(key) {
     this.data.keys.push({
       id: this.data.nextId++,
       key,
-      device_id: null,
-      device_name: null,
-      device_model: null,
-      ios_version: null,
-      bundle_id: null,
-      revoked: 0,
-      approved: 0,
       created_at: new Date().toISOString(),
-      activated_at: null,
-      last_used: null
+      activations: []
     });
     this.save();
   }
@@ -45,46 +34,85 @@ class LicenseDatabase {
     return this.data.keys.find(k => k.key === key) || null;
   }
 
-  addDeviceInfo(key, deviceId, deviceName, deviceModel, iosVersion, bundleId) {
+  addActivation(key, deviceId, deviceName, deviceModel, iosVersion, bundleId) {
     const k = this.findKey(key);
-    if (!k) return;
-    k.device_id = deviceId;
-    k.device_name = deviceName || null;
-    k.device_model = deviceModel || null;
-    k.ios_version = iosVersion || null;
-    k.bundle_id = bundleId || null;
-    k.activated_at = new Date().toISOString();
+    if (!k) return null;
+    const existing = k.activations.find(a => a.device_id === deviceId);
+    if (existing) return existing;
+
+    const act = {
+      device_id: deviceId,
+      device_name: deviceName || null,
+      device_model: deviceModel || null,
+      ios_version: iosVersion || null,
+      bundle_id: bundleId || null,
+      status: 'pending',
+      requested_at: new Date().toISOString(),
+      approved_at: null
+    };
+    k.activations.push(act);
     this.save();
+    return act;
   }
 
-  approveKey(key) {
+  findActivation(key, deviceId) {
     const k = this.findKey(key);
-    if (k) { k.approved = 1; this.save(); }
+    if (!k) return null;
+    return k.activations.find(a => a.device_id === deviceId) || null;
   }
 
-  rejectKey(key) {
+  approveDevice(key, deviceId) {
     const k = this.findKey(key);
-    if (k) { k.approved = -1; this.save(); }
+    if (!k) return false;
+    const act = k.activations.find(a => a.device_id === deviceId);
+    if (!act) return false;
+    act.status = 'approved';
+    act.approved_at = new Date().toISOString();
+    this.save();
+    return true;
   }
 
-  revokeKey(key) {
+  rejectDevice(key, deviceId) {
     const k = this.findKey(key);
-    if (k) { k.revoked = 1; this.save(); }
+    if (!k) return false;
+    const act = k.activations.find(a => a.device_id === deviceId);
+    if (!act) return false;
+    act.status = 'rejected';
+    this.save();
+    return true;
   }
 
-  unrevokeKey(key) {
+  getPendingActivations() {
+    const pending = [];
+    for (const k of this.data.keys) {
+      for (const a of k.activations) {
+        if (a.status === 'pending') {
+          pending.push({ key: k.key, ...a });
+        }
+      }
+    }
+    return pending.sort((a, b) => new Date(b.requested_at) - new Date(a.requested_at));
+  }
+
+  getActivationCount(key) {
     const k = this.findKey(key);
-    if (k) { k.revoked = 0; this.save(); }
+    if (!k) return 0;
+    return k.activations.filter(a => a.status === 'approved').length;
+  }
+
+  revokeDevice(key, deviceId) {
+    const k = this.findKey(key);
+    if (!k) return false;
+    const act = k.activations.find(a => a.device_id === deviceId);
+    if (!act) return false;
+    act.status = 'rejected';
+    this.save();
+    return true;
   }
 
   deleteKey(key) {
     this.data.keys = this.data.keys.filter(k => k.key !== key);
     this.save();
-  }
-
-  logUsage(key) {
-    const k = this.findKey(key);
-    if (k) { k.last_used = new Date().toISOString(); this.save(); }
   }
 
   getAllKeys() {
@@ -93,24 +121,32 @@ class LicenseDatabase {
     );
   }
 
-  getPendingCount() {
-    return this.data.keys.filter(k =>
-      k.device_id && k.approved === 0 && !k.revoked
-    ).length;
-  }
-
   getStats() {
     const keys = this.data.keys;
-    const total = keys.length;
-    const revoked_count = keys.filter(k => k.revoked).length;
-    const activated = keys.filter(k => k.device_id && k.approved === 1 && !k.revoked).length;
-    const available = keys.filter(k => !k.device_id && !k.revoked).length;
-    const pending = keys.filter(k => k.device_id && k.approved === 0 && !k.revoked).length;
+    let totalActs = 0, approvedActs = 0, pendingActs = 0, rejectedActs = 0;
+    for (const k of keys) {
+      for (const a of k.activations) {
+        totalActs++;
+        if (a.status === 'approved') approvedActs++;
+        else if (a.status === 'pending') pendingActs++;
+        else if (a.status === 'rejected') rejectedActs++;
+      }
+    }
     const today = new Date().toISOString().slice(0, 10);
-    const active_today = keys.filter(k =>
-      k.last_used && k.last_used.startsWith(today) && !k.revoked
-    ).length;
-    return { total, revoked_count, activated, available, pending, active_today };
+    const activeToday = keys.reduce((sum, k) =>
+      sum + k.activations.filter(a =>
+        a.status === 'approved' && a.approved_at && a.approved_at.startsWith(today)
+      ).length, 0
+    );
+
+    return {
+      total_keys: keys.length,
+      total_activations: totalActs,
+      approved: approvedActs,
+      pending: pendingActs,
+      rejected: rejectedActs,
+      active_today: activeToday
+    };
   }
 
   close() { }
