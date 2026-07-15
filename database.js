@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { execSync } = require('child_process');
 
 class LicenseDatabase {
   constructor(dbPath, github) {
@@ -79,26 +80,11 @@ class LicenseDatabase {
   }
 
   _githubLoad() {
-    return new Promise((resolve, reject) => {
-      const opts = {
-        hostname: 'api.github.com',
-        path: `/repos/${this.github.owner}/${this.github.repo}/contents/${this.github.path}`,
-        headers: {
-          'User-Agent': 'license-server',
-          'Authorization': `token ${this.github.token}`,
-          'Accept': 'application/vnd.github.v3.raw'
-        }
-      };
-      https.get(opts, res => {
-        if (res.statusCode === 200) {
-          let body = '';
-          res.on('data', c => body += c);
-          res.on('end', () => resolve(body));
-        } else {
-          reject(new Error(`GitHub load status ${res.statusCode}`));
-        }
-      }).on('error', reject);
-    });
+    const url = `https://api.github.com/repos/${this.github.owner}/${this.github.repo}/contents/${this.github.path}`;
+    const cmd = `curl -sf -H "User-Agent: license-server" -H "Authorization: token ${this.github.token}" -H "Accept: application/vnd.github.v3.raw" "${url}"`;
+    try {
+      return execSync(cmd, { encoding: 'utf8', timeout: 15000 });
+    } catch { return null; }
   }
 
   _githubSave(content) {
