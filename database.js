@@ -80,10 +80,26 @@ class LicenseDatabase {
   }
 
   _githubLoad() {
-    const url = `https://api.github.com/repos/${this.github.owner}/${this.github.repo}/contents/${this.github.path}`;
-    const cmd = `curl -sf -H "User-Agent: license-server" -H "Authorization: token ${this.github.token}" -H "Accept: application/vnd.github.v3.raw" "${url}"`;
+    const script = `
+      const https = require('https');
+      const opts = {
+        hostname: 'api.github.com',
+        path: '/repos/${this.github.owner}/${this.github.repo}/contents/${this.github.path}',
+        headers: {
+          'User-Agent': 'license-server',
+          'Authorization': 'token ${this.github.token}',
+          'Accept': 'application/vnd.github.v3.raw'
+        }
+      };
+      https.get(opts, res => {
+        if (res.statusCode !== 200) process.exit(1);
+        let b = '';
+        res.on('data', c => b += c);
+        res.on('end', () => process.stdout.write(b));
+      }).on('error', () => process.exit(1));
+    `;
     try {
-      return execSync(cmd, { encoding: 'utf8', timeout: 15000 });
+      return execSync(`node -e "${script.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`, { encoding: 'utf8', timeout: 15000 });
     } catch { return null; }
   }
 
