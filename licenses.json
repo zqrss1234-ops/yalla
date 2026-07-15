@@ -11,9 +11,9 @@
           "device_model": "iPhone12,1",
           "ios_version": "16.0",
           "bundle_id": "com.test.app",
-          "status": "pending",
+          "status": "approved",
           "requested_at": "2026-07-15T14:20:04.197Z",
-          "approved_at": null
+          "approved_at": "2026-07-15T14:31:36.197Z"
         }
       ]
     },
