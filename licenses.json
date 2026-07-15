@@ -16,7 +16,13 @@
           "approved_at": null
         }
       ]
+    },
+    {
+      "id": 2,
+      "key": "KVRP-ZP2L-RL5F-8VZ5",
+      "created_at": "2026-07-15T19:07:43.871Z",
+      "activations": []
     }
   ],
-  "nextId": 2
+  "nextId": 3
 }
