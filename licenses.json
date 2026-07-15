@@ -1,4 +1,11 @@
 {
-  "keys": [],
-  "nextId": 1
+  "keys": [
+    {
+      "id": 1,
+      "key": "CLNL-UU7W-E8HJ-C8HN",
+      "created_at": "2026-07-15T14:43:32.054Z",
+      "activations": []
+    }
+  ],
+  "nextId": 2
 }
