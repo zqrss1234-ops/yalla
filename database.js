@@ -293,6 +293,11 @@ class LicenseDatabase {
     };
   }
 
+  reset() {
+    this.data = { keys: [], nextId: 1 };
+    this.save();
+  }
+
   close() { }
 }
 

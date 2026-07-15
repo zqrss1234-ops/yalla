@@ -105,6 +105,13 @@ app.post('/api/admin/delete', (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/admin/reset', (req, res) => {
+  const { token } = req.body;
+  if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
+  db.reset();
+  res.json({ success: true, message: 'Database reset successfully' });
+});
+
 app.post('/api/validate', (req, res) => {
   const { key, deviceId, deviceName, deviceModel, iosVersion, bundleId } = req.body;
   if (!key || !deviceId) {
