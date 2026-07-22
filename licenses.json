@@ -21,7 +21,18 @@
       "id": 2,
       "key": "KVRP-ZP2L-RL5F-8VZ5",
       "created_at": "2026-07-15T19:07:43.871Z",
-      "activations": []
+      "activations": [
+        {
+          "device_id": "DBB7E1CF-CA79-4E10-A36C-63BAC2179ADB",
+          "device_name": "iPhone",
+          "device_model": "iPhone18,2",
+          "ios_version": "26.5.1",
+          "bundle_id": "com.yalla.yallalite",
+          "status": "pending",
+          "requested_at": "2026-07-22T08:27:05.010Z",
+          "approved_at": null
+        }
+      ]
     },
     {
       "id": 3,
