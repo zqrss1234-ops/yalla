@@ -65,9 +65,9 @@
           "device_model": "iPhone18,2",
           "ios_version": "26.5.1",
           "bundle_id": "com.yalla.yallalite",
-          "status": "pending",
+          "status": "approved",
           "requested_at": "2026-07-23T10:21:23.715Z",
-          "approved_at": null
+          "approved_at": "2026-07-23T10:21:29.873Z"
         }
       ]
     },
