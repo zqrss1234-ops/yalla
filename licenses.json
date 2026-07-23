@@ -48,6 +48,16 @@
           "status": "approved",
           "requested_at": "2026-07-22T08:34:52.039Z",
           "approved_at": "2026-07-22T08:34:57.686Z"
+        },
+        {
+          "device_id": "57C492EA-D231-41CA-AC76-193E82989083",
+          "device_name": "iPhone",
+          "device_model": "iPhone18,2",
+          "ios_version": "26.5.1",
+          "bundle_id": "com.yalla.yallalite22",
+          "status": "pending",
+          "requested_at": "2026-07-23T10:02:20.134Z",
+          "approved_at": null
         }
       ]
     },
