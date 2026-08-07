@@ -8,40 +8,48 @@ class LicenseDatabase {
     this.dbPath = dbPath || path.join(__dirname, 'licenses.json');
     this.github = github || null;
     this.data = { keys: [], nextId: 1 };
-    this._pendingSave = false;
     const dir = path.dirname(this.dbPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     this.load();
   }
 
   load() {
-    // 1) Try local file first — it's the authoritative live data
+    // GitHub is the ONLY persistent source (Render's local disk is ephemeral
+    // and is wiped on every redeploy/reset). Load it FIRST; local file is only
+    // a mirror/fallback if GitHub is unreachable.
+    let localData = null;
     try {
       if (fs.existsSync(this.dbPath)) {
         const raw = fs.readFileSync(this.dbPath, 'utf8').replace(/^\uFEFF/, '');
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed.keys) && (parsed.keys.length > 0 || parsed.nextId > 1)) {
-          this.data = parsed;
-          this.migrateOldKeys();
-          return;
-        }
+        if (Array.isArray(parsed.keys)) localData = parsed;
       }
     } catch { }
 
-    // 2) Fall back to GitHub backup only when local is empty/missing
     if (this.github) {
       try {
         const raw = this._githubLoad();
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed.keys)) {
-            this.data = parsed;
+            // Prefer the copy holding MORE keys (latest state keeps growing).
+            if (!localData || (parsed.keys.length >= localData.keys.length && parsed.nextId >= localData.nextId)) {
+              this.data = parsed;
+            } else {
+              this.data = localData;
+            }
             fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
             this.migrateOldKeys();
             return;
           }
         }
       } catch { }
+    }
+
+    if (localData) {
+      this.data = localData;
+      this.migrateOldKeys();
+      return;
     }
 
     this.data = { keys: [], nextId: 1 };
@@ -51,10 +59,89 @@ class LicenseDatabase {
     try {
       fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
     } catch { }
-    if (this.github && !this._pendingSave) {
-      this._pendingSave = true;
-      this._githubSave(JSON.stringify(this.data, null, 2));
+    if (this.github && !this._saveLoopRunning) {
+      this._saveLoopRunning = true;
+      this._saveLoop();
     }
+  }
+
+  /**
+   * Serialized save loop: ensures that the LATEST data always reaches GitHub,
+   * retries on transient/conflict errors, and never deadlocks the loop.
+   */
+  async _saveLoop() {
+    try {
+      while (true) {
+        const snapshot = JSON.stringify(this.data, null, 2);
+        let ok = false;
+        try {
+          ok = await this._githubPut(snapshot);
+        } catch (e) { ok = false; }
+        if (ok) {
+          // Successful — if data changed during the PUT, loop again.
+          const current = JSON.stringify(this.data, null, 2);
+          if (current === snapshot) break;
+        } else {
+          // Failure — wait briefly and retry, but never silently lose the loop.
+          await new Promise(r => setTimeout(r, 1500));
+        }
+      }
+    } finally {
+      this._saveLoopRunning = false;
+    }
+  }
+
+  _githubPut(content) {
+    const gh = this.github;
+    const getSha = () => new Promise((resolve, reject) => {
+      const opts = {
+        hostname: 'api.github.com',
+        path: `/repos/${gh.owner}/${gh.repo}/contents/${gh.path}`,
+        method: 'GET',
+        headers: {
+          'User-Agent': 'license-server',
+          'Authorization': `token ${gh.token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      };
+      const req = https.request(opts, res => {
+        let body = '';
+        res.on('data', c => body += c);
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(body);
+            resolve(json.sha || null);
+          } catch { resolve(null); }
+        });
+      });
+      req.on('error', () => resolve(null));
+      req.end();
+    });
+    return getSha().then(sha => new Promise((resolve) => {
+      const putOpts = {
+        hostname: 'api.github.com',
+        path: `/repos/${gh.owner}/${gh.repo}/contents/${gh.path}`,
+        method: 'PUT',
+        headers: {
+          'User-Agent': 'license-server',
+          'Authorization': `token ${gh.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        }
+      };
+      const body = JSON.stringify({
+        message: 'auto-save licenses',
+        content: Buffer.from(content).toString('base64'),
+        sha: sha || undefined
+      });
+      const req = https.request(putOpts, res => {
+        res.on('data', () => {});
+        res.on('end', () => resolve(res.statusCode >= 200 && res.statusCode < 300));
+      });
+      req.on('error', () => resolve(false));
+      req.write(body);
+      req.end();
+    }));
   }
 
   migrateOldKeys() {
@@ -103,58 +190,6 @@ class LicenseDatabase {
     try {
       return execSync(`node -e "${script.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`, { encoding: 'utf8', timeout: 15000 });
     } catch { return null; }
-  }
-
-  _githubSave(content) {
-    const gh = this.github;
-    const getSha = () => new Promise((resolve, reject) => {
-      const opts = {
-        hostname: 'api.github.com',
-        path: `/repos/${gh.owner}/${gh.repo}/contents/${gh.path}`,
-        method: 'GET',
-        headers: {
-          'User-Agent': 'license-server',
-          'Authorization': `token ${gh.token}`,
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      };
-      const req = https.request(opts, res => {
-        let body = '';
-        res.on('data', c => body += c);
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(body);
-            resolve(json.sha || null);
-          } catch { resolve(null); }
-        });
-      });
-      req.on('error', () => resolve(null));
-      req.end();
-    });
-
-    getSha().then(sha => {
-      const putOpts = {
-        hostname: 'api.github.com',
-        path: `/repos/${gh.owner}/${gh.repo}/contents/${gh.path}`,
-        method: 'PUT',
-        headers: {
-          'User-Agent': 'license-server',
-          'Authorization': `token ${gh.token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json'
-        }
-      };
-      const body = JSON.stringify({
-        message: 'auto-save licenses',
-        content: Buffer.from(content).toString('base64'),
-        sha: sha || undefined
-      });
-      const req = https.request(putOpts);
-      req.on('error', () => {});
-      req.on('close', () => { this._pendingSave = false; });
-      req.write(body);
-      req.end();
-    }).catch(() => { this._pendingSave = false; });
   }
 
   addKey(key) {
