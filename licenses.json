@@ -195,16 +195,6 @@
           "status": "approved",
           "requested_at": "2026-08-07T19:03:14.189Z",
           "approved_at": "2026-08-07T19:03:27.061Z"
-        },
-        {
-          "device_id": "TEST-USER-iPHONE12-001",
-          "device_name": "Adam iPhone 12",
-          "device_model": "iPhone 12 Pro",
-          "ios_version": "18.5",
-          "bundle_id": "com.yalla.app",
-          "status": "pending",
-          "requested_at": "2026-08-07T19:03:16.451Z",
-          "approved_at": null
         }
       ]
     },
