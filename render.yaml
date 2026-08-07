@@ -6,6 +6,14 @@ services:
     startCommand: npm start
     envVars:
       - key: ADMIN_SECRET
-        value: your-secret-key-change-this
+        value: impossible
       - key: PORT
         value: 3000
+      - key: GH_TOKEN
+        value: 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
+      - key: GH_OWNER
+        value: zqrss1234-ops
+      - key: GH_REPO
+        value: yalla
+      - key: GH_PATH
+        value: licenses.json
