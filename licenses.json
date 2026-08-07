@@ -192,9 +192,9 @@
           "device_model": "iPhone13,3",
           "ios_version": "16.3.1",
           "bundle_id": "com.yalla.yallalite",
-          "status": "pending",
+          "status": "approved",
           "requested_at": "2026-08-07T19:03:14.189Z",
-          "approved_at": null
+          "approved_at": "2026-08-07T19:03:27.061Z"
         },
         {
           "device_id": "TEST-USER-iPHONE12-001",
