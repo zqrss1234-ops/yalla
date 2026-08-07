@@ -104,9 +104,9 @@
           "device_model": "iPad13,18",
           "ios_version": "17.5.1",
           "bundle_id": "com.yalla.yallalite.1",
-          "status": "pending",
+          "status": "approved",
           "requested_at": "2026-08-07T20:00:03.880Z",
-          "approved_at": null
+          "approved_at": "2026-08-07T20:00:03.892Z"
         }
       ]
     },
