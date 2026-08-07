@@ -158,11 +158,16 @@ app.post('/api/validate', (req, res) => {
       return res.json({ valid: false, needsApproval: true, message: 'بانتظار موافقة المطور' });
     }
 
-    // Device already has a DIFFERENT code
-    const msg = deviceBinding.activation.status === 'approved'
-      ? 'هذا الجهاز لديه رمز تفعيل نشط بالفعل'
-      : 'هذا الجهاز لديه طلب تفعيل معلق بالفعل';
-    return res.json({ valid: false, message: msg });
+    // Device has a DIFFERENT code. If that old activation is approved, the
+    // device is already actively bound somewhere else -> block. If it is only
+    // pending/rejected (e.g. orphaned request after reinstall), clear the old
+    // record and let the device switch to the newly entered code.
+    if (deviceBinding.activation.status === 'approved') {
+      return res.json({ valid: false, message: 'هذا الجهاز لديه رمز تفعيل نشط بالفعل' });
+    }
+
+    db.removeDevice(deviceBinding.key, deviceId);
+    // Fall through to a fresh activation on the new code.
   }
 
   // Reinstall case: a code that already has APPROVED devices gets a new device id
