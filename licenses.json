@@ -149,16 +149,6 @@
           "status": "approved",
           "requested_at": "2026-07-23T20:33:26.241Z",
           "approved_at": "2026-07-23T20:33:33.262Z"
-        },
-        {
-          "device_id": "REINSTALL-TEST-999",
-          "device_name": "iPhone",
-          "device_model": "iPhone18,2",
-          "ios_version": null,
-          "bundle_id": "unknown",
-          "status": "pending",
-          "requested_at": "2026-08-07T18:26:59.922Z",
-          "approved_at": null
         }
       ]
     },
