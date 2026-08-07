@@ -59,30 +59,41 @@ class LicenseDatabase {
     try {
       fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
     } catch { }
-    if (this.github && !this._saveLoopRunning) {
-      this._saveLoopRunning = true;
-      this._saveLoop();
+    if (this.github) {
+      this._saveRequested = true;
+      if (!this._saveLoopRunning) {
+        this._saveLoopRunning = true;
+        this._saveLoop();
+      }
     }
   }
 
   /**
-   * Serialized save loop: ensures that the LATEST data always reaches GitHub,
-   * retries on transient/conflict errors, and never deadlocks the loop.
+   * Durable save loop: runs until the GitHub copy equals the CURRENT in-memory
+   * state. Every change made while a PUT is in flight flags _saveRequested so
+   * the loop keeps going until the latest state is persisted — nothing is
+   * silently dropped, and deletions also reach GitHub.
    */
   async _saveLoop() {
     try {
       while (true) {
+        this._saveRequested = false;
         const snapshot = JSON.stringify(this.data, null, 2);
         let ok = false;
         try {
           ok = await this._githubPut(snapshot);
         } catch (e) { ok = false; }
         if (ok) {
-          // Successful — if data changed during the PUT, loop again.
-          const current = JSON.stringify(this.data, null, 2);
-          if (current === snapshot) break;
+          if (JSON.stringify(this.data, null, 2) !== snapshot) {
+            // Data changed mid-flight — persist again.
+            continue;
+          }
+          if (!this._saveRequested) {
+            // GitHub now matches in-memory state; nothing pending — stop.
+            break;
+          }
         } else {
-          // Failure — wait briefly and retry, but never silently lose the loop.
+          // Failure — retry, never silently lose the save.
           await new Promise(r => setTimeout(r, 1500));
         }
       }
