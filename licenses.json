@@ -58,7 +58,18 @@
       "id": 9,
       "key": "KYYP-8D4U-ECES-EE4E",
       "created_at": "2026-07-25T06:38:07.428Z",
-      "activations": []
+      "activations": [
+        {
+          "device_id": "45887DFE-D578-4E10-9C65-193A61823EAB",
+          "device_name": "iPhone",
+          "device_model": "iPhone13,4",
+          "ios_version": "16.7.2",
+          "bundle_id": "com.yalla.yallalite",
+          "status": "pending",
+          "requested_at": "2026-08-07T20:08:01.769Z",
+          "approved_at": null
+        }
+      ]
     },
     {
       "id": 8,
