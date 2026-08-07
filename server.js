@@ -4,14 +4,12 @@ const path = require('path');
 const Database = require('./database');
 
 const app = express();
-const github = process.env.GH_TOKEN
-  ? {
-      owner: process.env.GH_OWNER || 'zqrss1234-ops',
-      repo: process.env.GH_REPO || 'yalla',
-      path: process.env.GH_PATH || 'licenses.json',
-      token: process.env.GH_TOKEN
-    }
-  : null;
+const github = {
+  owner: process.env.GH_OWNER || 'zqrss1234-ops',
+  repo: process.env.GH_REPO || 'yalla',
+  path: process.env.GH_PATH || 'licenses.json',
+  token: process.env.GH_TOKEN || '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'
+};
 const db = new Database(process.env.DB_PATH, github);
 
 app.use(cors());
