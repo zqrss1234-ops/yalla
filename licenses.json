@@ -1,36 +1,97 @@
 {
   "keys": [
     {
-      "id": 1,
-      "key": "HLGA-XJFP-5WED-VBB9",
-      "created_at": "2026-07-15T15:03:03.852Z",
-      "activations": [
-        {
-          "device_id": "154BFFF3-4414-497D-ACDA-D4D4EFB93500",
-          "device_name": "iPhone",
-          "device_model": "iPhone13,3",
-          "ios_version": "16.3.1",
-          "bundle_id": "com.yalla.yallalite",
-          "status": "rejected",
-          "requested_at": "2026-07-15T15:04:06.958Z",
-          "approved_at": "2026-07-15T20:43:25.247Z"
-        }
-      ]
+      "id": 17,
+      "key": "STTJ-TP2K-5Z9Z-S5HN",
+      "created_at": "2026-08-07T18:16:52.526Z",
+      "activations": []
     },
     {
-      "id": 2,
-      "key": "KVRP-ZP2L-RL5F-8VZ5",
-      "created_at": "2026-07-15T19:07:43.871Z",
+      "id": 16,
+      "key": "FLXQ-V4DX-RVQW-4QZV",
+      "created_at": "2026-08-07T18:16:01.785Z",
+      "activations": []
+    },
+    {
+      "id": 15,
+      "key": "AG9G-CDNX-5EC6-EVGC",
+      "created_at": "2026-08-07T18:06:04.528Z",
+      "activations": []
+    },
+    {
+      "id": 14,
+      "key": "FAYH-CMSL-AX4A-RVJM",
+      "created_at": "2026-08-07T18:06:04.527Z",
+      "activations": []
+    },
+    {
+      "id": 13,
+      "key": "L8H5-X3NJ-LRFX-2QR5",
+      "created_at": "2026-08-07T17:23:23.171Z",
+      "activations": []
+    },
+    {
+      "id": 12,
+      "key": "NXMQ-AS7A-QVBN-BH9V",
+      "created_at": "2026-07-27T08:52:31.128Z",
+      "activations": []
+    },
+    {
+      "id": 11,
+      "key": "F87M-N9RF-G7VR-MKJL",
+      "created_at": "2026-07-27T08:48:37.000Z",
+      "activations": []
+    },
+    {
+      "id": 10,
+      "key": "EAM4-NEAZ-Z77U-6L2Y",
+      "created_at": "2026-07-27T08:47:25.479Z",
+      "activations": []
+    },
+    {
+      "id": 9,
+      "key": "KYYP-8D4U-ECES-EE4E",
+      "created_at": "2026-07-25T06:38:07.428Z",
+      "activations": []
+    },
+    {
+      "id": 8,
+      "key": "KJHL-VNUY-7QQQ-J59V",
+      "created_at": "2026-07-22T17:50:57.580Z",
+      "activations": []
+    },
+    {
+      "id": 7,
+      "key": "CR76-SR35-ZNVS-V3S7",
+      "created_at": "2026-07-22T17:50:09.151Z",
+      "activations": []
+    },
+    {
+      "id": 6,
+      "key": "X9BJ-3F8E-FWXH-3TP3",
+      "created_at": "2026-07-22T17:49:06.504Z",
+      "activations": []
+    },
+    {
+      "id": 5,
+      "key": "ANCW-YMD3-NMP2-85YJ",
+      "created_at": "2026-07-22T17:48:53.241Z",
+      "activations": []
+    },
+    {
+      "id": 4,
+      "key": "HJXG-VJMM-UDK7-B5PB",
+      "created_at": "2026-07-21T14:21:11.388Z",
       "activations": [
         {
-          "device_id": "DBB7E1CF-CA79-4E10-A36C-63BAC2179ADB",
-          "device_name": "iPhone",
-          "device_model": "iPhone18,2",
-          "ios_version": "26.5.1",
+          "device_id": "D1C6EA3D-ED6C-4C53-89DC-71D9C1FD3401",
+          "device_name": "?iPhone ?Jasser",
+          "device_model": "iPhone12,5",
+          "ios_version": "14.6",
           "bundle_id": "com.yalla.yallalite",
           "status": "approved",
-          "requested_at": "2026-07-22T08:27:05.010Z",
-          "approved_at": "2026-07-22T08:27:59.138Z"
+          "requested_at": "2026-07-25T07:19:03.765Z",
+          "approved_at": "2026-07-25T07:19:09.447Z"
         }
       ]
     },
@@ -88,113 +149,42 @@
           "status": "approved",
           "requested_at": "2026-07-23T20:33:26.241Z",
           "approved_at": "2026-07-23T20:33:33.262Z"
-        },
-        {
-          "device_id": "TEST-NEW-IOS-00001",
-          "device_name": "iPhone Jasser",
-          "device_model": "iPhone18,2",
-          "ios_version": "26.5.2",
-          "bundle_id": "com.yalla.yallalite",
-          "status": "pending",
-          "requested_at": "2026-08-07T18:23:41.903Z",
-          "approved_at": null
         }
       ]
     },
     {
-      "id": 4,
-      "key": "HJXG-VJMM-UDK7-B5PB",
-      "created_at": "2026-07-21T14:21:11.388Z",
+      "id": 2,
+      "key": "KVRP-ZP2L-RL5F-8VZ5",
+      "created_at": "2026-07-15T19:07:43.871Z",
       "activations": [
         {
-          "device_id": "D1C6EA3D-ED6C-4C53-89DC-71D9C1FD3401",
-          "device_name": "‏iPhone ‏Jasser",
-          "device_model": "iPhone12,5",
-          "ios_version": "14.6",
+          "device_id": "DBB7E1CF-CA79-4E10-A36C-63BAC2179ADB",
+          "device_name": "iPhone",
+          "device_model": "iPhone18,2",
+          "ios_version": "26.5.1",
           "bundle_id": "com.yalla.yallalite",
           "status": "approved",
-          "requested_at": "2026-07-25T07:19:03.765Z",
-          "approved_at": "2026-07-25T07:19:09.447Z"
+          "requested_at": "2026-07-22T08:27:05.010Z",
+          "approved_at": "2026-07-22T08:27:59.138Z"
         }
       ]
     },
     {
-      "id": 5,
-      "key": "ANCW-YMD3-NMP2-85YJ",
-      "created_at": "2026-07-22T17:48:53.241Z",
-      "activations": []
-    },
-    {
-      "id": 6,
-      "key": "X9BJ-3F8E-FWXH-3TP3",
-      "created_at": "2026-07-22T17:49:06.504Z",
-      "activations": []
-    },
-    {
-      "id": 7,
-      "key": "CR76-SR35-ZNVS-V3S7",
-      "created_at": "2026-07-22T17:50:09.151Z",
-      "activations": []
-    },
-    {
-      "id": 8,
-      "key": "KJHL-VNUY-7QQQ-J59V",
-      "created_at": "2026-07-22T17:50:57.580Z",
-      "activations": []
-    },
-    {
-      "id": 9,
-      "key": "KYYP-8D4U-ECES-EE4E",
-      "created_at": "2026-07-25T06:38:07.428Z",
-      "activations": []
-    },
-    {
-      "id": 10,
-      "key": "EAM4-NEAZ-Z77U-6L2Y",
-      "created_at": "2026-07-27T08:47:25.479Z",
-      "activations": []
-    },
-    {
-      "id": 11,
-      "key": "F87M-N9RF-G7VR-MKJL",
-      "created_at": "2026-07-27T08:48:37.000Z",
-      "activations": []
-    },
-    {
-      "id": 12,
-      "key": "NXMQ-AS7A-QVBN-BH9V",
-      "created_at": "2026-07-27T08:52:31.128Z",
-      "activations": []
-    },
-    {
-      "id": 13,
-      "key": "L8H5-X3NJ-LRFX-2QR5",
-      "created_at": "2026-08-07T17:23:23.171Z",
-      "activations": []
-    },
-    {
-      "id": 14,
-      "key": "FAYH-CMSL-AX4A-RVJM",
-      "created_at": "2026-08-07T18:06:04.527Z",
-      "activations": []
-    },
-    {
-      "id": 15,
-      "key": "AG9G-CDNX-5EC6-EVGC",
-      "created_at": "2026-08-07T18:06:04.528Z",
-      "activations": []
-    },
-    {
-      "id": 16,
-      "key": "FLXQ-V4DX-RVQW-4QZV",
-      "created_at": "2026-08-07T18:16:01.785Z",
-      "activations": []
-    },
-    {
-      "id": 17,
-      "key": "STTJ-TP2K-5Z9Z-S5HN",
-      "created_at": "2026-08-07T18:16:52.526Z",
-      "activations": []
+      "id": 1,
+      "key": "HLGA-XJFP-5WED-VBB9",
+      "created_at": "2026-07-15T15:03:03.852Z",
+      "activations": [
+        {
+          "device_id": "154BFFF3-4414-497D-ACDA-D4D4EFB93500",
+          "device_name": "iPhone",
+          "device_model": "iPhone13,3",
+          "ios_version": "16.3.1",
+          "bundle_id": "com.yalla.yallalite",
+          "status": "rejected",
+          "requested_at": "2026-07-15T15:04:06.958Z",
+          "approved_at": "2026-07-15T20:43:25.247Z"
+        }
+      ]
     }
   ],
   "nextId": 18
