@@ -179,18 +179,7 @@
       "id": 1,
       "key": "HLGA-XJFP-5WED-VBB9",
       "created_at": "2026-07-15T15:03:03.852Z",
-      "activations": [
-        {
-          "device_id": "154BFFF3-4414-497D-ACDA-D4D4EFB93500",
-          "device_name": "iPhone",
-          "device_model": "iPhone13,3",
-          "ios_version": "16.3.1",
-          "bundle_id": "com.yalla.yallalite",
-          "status": "rejected",
-          "requested_at": "2026-07-15T15:04:06.958Z",
-          "approved_at": "2026-07-15T20:43:25.247Z"
-        }
-      ]
+      "activations": []
     },
     {
       "id": 20,
