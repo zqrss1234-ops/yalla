@@ -165,6 +165,15 @@ app.post('/api/validate', (req, res) => {
     return res.json({ valid: false, message: msg });
   }
 
+  // Reinstall case: a code that already has APPROVED devices gets a new device id
+  // (user reinstalled apps) -> auto-approve so it doesn't get stuck pending.
+  const existingApproved = (license.activations || []).filter(a => a.status === 'approved').length;
+  if (existingApproved > 0) {
+    db.addActivation(key, deviceId, deviceName, deviceModel, iosVersion, bundleId || 'unknown');
+    db.approveDevice(key, deviceId);
+    return res.json({ valid: true, message: '✓ تم التفعيل بنجاح' });
+  }
+
   db.addActivation(key, deviceId, deviceName, deviceModel, iosVersion, bundleId || 'unknown');
 
   res.json({
