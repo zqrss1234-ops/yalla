@@ -18,7 +18,7 @@ class LicenseDatabase {
     // 1) Try local file first — it's the authoritative live data
     try {
       if (fs.existsSync(this.dbPath)) {
-        const raw = fs.readFileSync(this.dbPath, 'utf8');
+        const raw = fs.readFileSync(this.dbPath, 'utf8').replace(/^\uFEFF/, '');
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed.keys) && (parsed.keys.length > 0 || parsed.nextId > 1)) {
           this.data = parsed;

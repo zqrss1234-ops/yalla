@@ -113,6 +113,20 @@ app.post('/api/admin/backup', (req, res) => {
   res.json({ success: true, data: { nextId: db.data.nextId, keys: db.getAllKeys() } });
 });
 
+app.post('/api/admin/import', (req, res) => {
+  const { token, data } = req.body;
+  if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
+  if (!data || !Array.isArray(data.keys)) {
+    return res.status(400).json({ error: 'Invalid data. Expected { keys: [...], nextId: n }' });
+  }
+  db.data = {
+    keys: data.keys.map(k => ({ ...k, activations: k.activations || [] })),
+    nextId: data.nextId || (data.keys.length + 1)
+  };
+  db.save();
+  res.json({ success: true, message: `Imported ${db.data.keys.length} keys` });
+});
+
 app.post('/api/admin/reset', (req, res) => {
   const { token } = req.body;
   if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
