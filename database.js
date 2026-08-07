@@ -15,11 +15,12 @@ class LicenseDatabase {
   }
 
   load() {
+    // 1) Try local file first — it's the authoritative live data
     try {
       if (fs.existsSync(this.dbPath)) {
         const raw = fs.readFileSync(this.dbPath, 'utf8');
         const parsed = JSON.parse(raw);
-        if (parsed.keys && Array.isArray(parsed.keys)) {
+        if (Array.isArray(parsed.keys) && (parsed.keys.length > 0 || parsed.nextId > 1)) {
           this.data = parsed;
           this.migrateOldKeys();
           return;
@@ -27,12 +28,13 @@ class LicenseDatabase {
       }
     } catch { }
 
+    // 2) Fall back to GitHub backup only when local is empty/missing
     if (this.github) {
       try {
         const raw = this._githubLoad();
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed.keys && Array.isArray(parsed.keys)) {
+          if (Array.isArray(parsed.keys)) {
             this.data = parsed;
             fs.writeFileSync(this.dbPath, JSON.stringify(this.data, null, 2), 'utf8');
             this.migrateOldKeys();

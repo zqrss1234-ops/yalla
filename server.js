@@ -4,12 +4,14 @@ const path = require('path');
 const Database = require('./database');
 
 const app = express();
-const github = {
-  owner: 'zqrss1234-ops',
-  repo: 'yalla',
-  path: 'licenses.json',
-  token: process.env.GH_TOKEN || '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'
-};
+const github = process.env.GH_TOKEN
+  ? {
+      owner: process.env.GH_OWNER || 'zqrss1234-ops',
+      repo: process.env.GH_REPO || 'yalla',
+      path: process.env.GH_PATH || 'licenses.json',
+      token: process.env.GH_TOKEN
+    }
+  : null;
 const db = new Database(process.env.DB_PATH, github);
 
 app.use(cors());
@@ -103,6 +105,12 @@ app.post('/api/admin/delete', (req, res) => {
   if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
   db.deleteKey(key);
   res.json({ success: true });
+});
+
+app.post('/api/admin/backup', (req, res) => {
+  const { token } = req.body;
+  if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
+  res.json({ success: true, data: { nextId: db.data.nextId, keys: db.getAllKeys() } });
 });
 
 app.post('/api/admin/reset', (req, res) => {
