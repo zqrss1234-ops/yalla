@@ -97,6 +97,16 @@
           "status": "approved",
           "requested_at": "2026-08-07T19:58:11.013Z",
           "approved_at": "2026-08-07T19:59:05.642Z"
+        },
+        {
+          "device_id": "50797E4B-CE4D-47FD-9129-BEF6D128AE61",
+          "device_name": "iPad",
+          "device_model": "iPad13,18",
+          "ios_version": "17.5.1",
+          "bundle_id": "com.yalla.yallalite.1",
+          "status": "pending",
+          "requested_at": "2026-08-07T20:00:03.880Z",
+          "approved_at": null
         }
       ]
     },
