@@ -156,7 +156,7 @@
           "device_model": "iPhone 15 Pro",
           "ios_version": "18.5",
           "bundle_id": "com.yalla.app",
-          "status": "approved",
+          "status": "rejected",
           "requested_at": "2026-08-07T18:45:45.763Z",
           "approved_at": "2026-08-07T18:45:45.773Z"
         }
