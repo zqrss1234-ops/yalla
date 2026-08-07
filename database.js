@@ -302,6 +302,14 @@ class LicenseDatabase {
     return true;
   }
 
+  removeDevice(key, deviceId) {
+    const k = this.findKey(key);
+    if (!k) return false;
+    k.activations = (k.activations || []).filter(a => a.device_id !== deviceId);
+    this.save();
+    return true;
+  }
+
   deleteKey(key) {
     this.data.keys = this.data.keys.filter(k => k.key !== key);
     this.save();

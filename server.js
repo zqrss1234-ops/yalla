@@ -88,11 +88,11 @@ app.post('/api/admin/revoke', (req, res) => {
   const { token, key, deviceId } = req.body;
   if (!verifyToken(token)) return res.status(403).json({ error: 'Unauthorized' });
   if (deviceId) {
-    db.revokeDevice(key, deviceId);
+    db.removeDevice(key, deviceId);
   } else {
     const k = db.findKey(key);
     if (k) {
-      k.activations.filter(a => a.status === 'approved').forEach(a => db.revokeDevice(key, a.device_id));
+      k.activations.filter(a => a.status === 'approved').forEach(a => db.removeDevice(key, a.device_id));
     }
   }
   res.json({ success: true });
