@@ -149,6 +149,16 @@
           "status": "approved",
           "requested_at": "2026-07-23T20:33:26.241Z",
           "approved_at": "2026-07-23T20:33:33.262Z"
+        },
+        {
+          "device_id": "FINAL-CHECK-777",
+          "device_name": "iPhone Test",
+          "device_model": "iPhone 15 Pro",
+          "ios_version": "18.5",
+          "bundle_id": "com.yalla.app",
+          "status": "pending",
+          "requested_at": "2026-08-07T18:45:45.763Z",
+          "approved_at": null
         }
       ]
     },
