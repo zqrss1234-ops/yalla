@@ -281,7 +281,18 @@
       "id": 22,
       "key": "X2S2-DMFX-FNEH-WUQE",
       "created_at": "2026-08-07T19:00:19.618Z",
-      "activations": []
+      "activations": [
+        {
+          "device_id": "7A2FEE9F-FEA8-47CD-ACA6-72A7EF749EFB",
+          "device_name": "iPhone",
+          "device_model": "iPhone16,2",
+          "ios_version": "26.6",
+          "bundle_id": "com.yalla.yallalite",
+          "status": "pending",
+          "requested_at": "2026-08-08T17:02:36.282Z",
+          "approved_at": null
+        }
+      ]
     },
     {
       "id": 23,
