@@ -268,6 +268,16 @@
           "status": "approved",
           "requested_at": "2026-08-07T19:05:30.615Z",
           "approved_at": "2026-08-07T19:05:30.630Z"
+        },
+        {
+          "device_id": "05389105-7E64-40EC-BA97-B859B85C28C2",
+          "device_name": "iPhone",
+          "device_model": "iPhone13,3",
+          "ios_version": "16.3.1",
+          "bundle_id": "com.yalla.yallalite.3",
+          "status": "pending",
+          "requested_at": "2026-08-08T17:41:17.138Z",
+          "approved_at": null
         }
       ]
     },
