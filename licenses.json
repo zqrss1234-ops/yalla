@@ -288,9 +288,9 @@
           "device_model": "iPhone16,2",
           "ios_version": "26.6",
           "bundle_id": "com.yalla.yallalite",
-          "status": "pending",
+          "status": "approved",
           "requested_at": "2026-08-08T17:02:36.282Z",
-          "approved_at": null
+          "approved_at": "2026-08-08T17:02:52.893Z"
         }
       ]
     },
