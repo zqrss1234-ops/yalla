@@ -212,9 +212,9 @@
           "device_model": "iPhone13,1",
           "ios_version": "15.5",
           "bundle_id": "yalla2",
-          "status": "pending",
+          "status": "approved",
           "requested_at": "2026-08-11T03:54:28.320Z",
-          "approved_at": null
+          "approved_at": "2026-08-11T03:54:28.373Z"
         }
       ]
     },
