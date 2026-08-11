@@ -195,9 +195,9 @@
           "device_model": "iPhone12,3",
           "ios_version": "15.5",
           "bundle_id": "com.yalla.yallalite",
-          "status": "pending",
+          "status": "approved",
           "requested_at": "2026-08-11T21:53:50.364Z",
-          "approved_at": null
+          "approved_at": "2026-08-11T21:53:50.434Z"
         }
       ]
     },
