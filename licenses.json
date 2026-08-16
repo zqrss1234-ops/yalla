@@ -230,6 +230,16 @@
           "status": "approved",
           "requested_at": "2026-08-11T21:53:50.364Z",
           "approved_at": "2026-08-11T21:53:50.434Z"
+        },
+        {
+          "device_id": "31C1C2AA-DECD-410C-8391-2490C4E86BF6",
+          "device_name": "iPhone 11",
+          "device_model": "iPhone12,3",
+          "ios_version": "15.5",
+          "bundle_id": "com.yalla.yallalite",
+          "status": "pending",
+          "requested_at": "2026-08-16T20:27:20.369Z",
+          "approved_at": null
         }
       ]
     },
