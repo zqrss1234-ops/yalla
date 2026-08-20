@@ -22,7 +22,18 @@
       "id": 15,
       "key": "AG9G-CDNX-5EC6-EVGC",
       "created_at": "2026-08-07T18:06:04.528Z",
-      "activations": []
+      "activations": [
+        {
+          "device_id": "5124987B-B607-4B63-BFA1-471A4882296E",
+          "device_name": "iPhone",
+          "device_model": "iPhone12,3",
+          "ios_version": "13.2.3",
+          "bundle_id": "com.yalla.yallalite",
+          "status": "pending",
+          "requested_at": "2026-08-20T22:33:31.723Z",
+          "approved_at": null
+        }
+      ]
     },
     {
       "id": 14,
