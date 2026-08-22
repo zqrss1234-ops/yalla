@@ -612,7 +612,18 @@
       "id": 29,
       "key": "YXL5-ZMYS-55ZA-484J",
       "created_at": "2026-08-07T19:00:19.619Z",
-      "activations": []
+      "activations": [
+        {
+          "device_id": "07D646EE-C59E-4EB1-BD7B-AFEB97307DA2",
+          "device_name": "iPhone",
+          "device_model": "iPhone18,2",
+          "ios_version": "26.1",
+          "bundle_id": "com.yalla.yallalite",
+          "status": "pending",
+          "requested_at": "2026-08-22T04:09:57.358Z",
+          "approved_at": null
+        }
+      ]
     },
     {
       "id": 33,
