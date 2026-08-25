@@ -651,9 +651,9 @@
           "device_model": "iPhone15,3",
           "ios_version": "17.7",
           "bundle_id": "456",
-          "status": "pending",
+          "status": "approved",
           "requested_at": "2026-08-25T01:01:01.346Z",
-          "approved_at": null
+          "approved_at": "2026-08-25T01:01:40.504Z"
         }
       ]
     },
