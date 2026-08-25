@@ -664,6 +664,16 @@
           "status": "approved",
           "requested_at": "2026-08-25T01:01:01.346Z",
           "approved_at": "2026-08-25T01:01:40.504Z"
+        },
+        {
+          "device_id": "2915E2F5-3092-405D-AF6E-8EAE928DDFB2",
+          "device_name": "‏iPhone ‏Hadi (2)",
+          "device_model": "iPhone11,2",
+          "ios_version": "15.5",
+          "bundle_id": "com.yalla.yallalite.22GW6H7JCP",
+          "status": "pending",
+          "requested_at": "2026-08-25T22:27:43.774Z",
+          "approved_at": null
         }
       ]
     },
