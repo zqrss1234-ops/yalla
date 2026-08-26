@@ -718,9 +718,9 @@
           "device_model": "iPhone15,3",
           "ios_version": "16.6",
           "bundle_id": "com.yalla.yallalite",
-          "status": "pending",
+          "status": "approved",
           "requested_at": "2026-08-26T00:46:34.824Z",
-          "approved_at": null
+          "approved_at": "2026-08-26T00:46:34.835Z"
         }
       ]
     },
