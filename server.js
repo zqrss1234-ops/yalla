@@ -31,7 +31,7 @@ function saveDB(data) {
 }
 
 // -------------------------------------------------------------
-// 1. مسار التحقق الصارم والمباشر
+// 1. مسار التحقق الصارم (يرفض أي كود وهمي فوراً بدون تسجيل)
 // -------------------------------------------------------------
 app.post('/api/validate', (req, res) => {
   const rawKey = req.body.key;
@@ -47,37 +47,36 @@ app.post('/api/validate', (req, res) => {
 
   const key = rawKey.trim().toUpperCase();
   const db = loadDB();
+  
+  // فحص هل الكود مولد رسمياً وموجود في قاعدة البيانات
   let keyObj = db.keys.find(k => k.key && k.key.trim().toUpperCase() === key);
 
+  // ❌ إذا كان الكود وهمي أو غير موجود -> طرد ورفض فوري بدون إضافته للوحة نهائياً!
   if (!keyObj) {
-    keyObj = {
-      key: key,
-      client_name: 'مشترك سابق',
-      notes: 'كود مسجل تلقائياً',
-      created_at: new Date().toISOString(),
-      activations: []
-    };
-    db.keys.unshift(keyObj);
-    saveDB(db);
+    return res.json({ 
+      valid: false, 
+      needs_approval: false, 
+      message: "⚠️ كود التفعيل غير صالح، تواصل مع عبدالإله" 
+    });
   }
 
   if (!keyObj.activations) {
     keyObj.activations = [];
   }
 
-  // 1. فحص هل هناك جهاز مفعل
+  // 1. فحص هل هناك جهاز مفعل لهذا الكود
   const approvedActivation = keyObj.activations.find(a => a.status === 'approved');
 
   if (approvedActivation) {
-    // 🔒 إذا حاول جهاز ثانٍ استخدام نفس الكود -> حظر فوري
+    // 🔒 إذا حاول جهاز آخر استخدام نفس الكود -> حظر وطرد فوري
     if (approvedActivation.device_id !== deviceId) {
       return res.json({ 
         valid: false, 
-        needs_approval: false,
+        needs_approval: false, 
         message: "⚠️ هذا الكود مفعّل لجهاز آخر ولا يمكن مشاركته!" 
       });
     }
-    // الجهاز المعتمد
+    // نفس الجهاز الأصلي المعتمد -> دخول مباشر
     return res.json({ valid: true, message: "تم التحقق بنجاح" });
   }
 
@@ -100,7 +99,7 @@ app.post('/api/validate', (req, res) => {
   if (thisDevice.status === 'banned' || thisDevice.status === 'rejected') {
     return res.json({ 
       valid: false, 
-      needs_approval: false,
+      needs_approval: false, 
       message: "🚫 تم إيقاف وقفل الأداة من عمك عبدالإله" 
     });
   }
@@ -238,7 +237,7 @@ app.post('/api/admin/delete', (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 3. لوحة التحكم المدمجة
+// 3. لوحة التحكم
 // -------------------------------------------------------------
 app.get('/', (req, res) => {
   const html = `<!DOCTYPE html>
@@ -380,7 +379,7 @@ app.get('/', (req, res) => {
 
   <div class="table-card">
     <div class="table-header">
-      <h2>سجل المشتركين والأجهزة (تحكم كامل)</h2>
+      <h2>سجل المشتركين والأجهزة (الأكواد الرسمية فقط)</h2>
       <input type="text" id="search" class="input" placeholder="بحث باسم المشترك أو الكود..." oninput="filterRows()" style="width: 280px;">
     </div>
     <table>
