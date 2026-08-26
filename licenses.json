@@ -744,6 +744,16 @@
           "status": "approved",
           "requested_at": "2026-08-26T03:11:31.706Z",
           "approved_at": "2026-08-26T03:11:31.760Z"
+        },
+        {
+          "device_id": "9FA2F382-8BF5-4630-B8E7-A9652B0D42B1",
+          "device_name": "iPhone",
+          "device_model": "iPhone15,3",
+          "ios_version": "17.7",
+          "bundle_id": "com.yalla.yallalite6",
+          "status": "pending",
+          "requested_at": "2026-08-26T03:17:33.132Z",
+          "approved_at": null
         }
       ]
     },
