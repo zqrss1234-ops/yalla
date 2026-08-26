@@ -826,7 +826,18 @@
       "id": 37,
       "key": "77KF-97C5-EHXK-WGC4",
       "created_at": "2026-08-07T19:00:19.620Z",
-      "activations": []
+      "activations": [
+        {
+          "device_id": "7A1F9829-CFC0-42F9-802F-C4BAE1DA7984",
+          "device_name": "iPhone",
+          "device_model": "iPhone12,5",
+          "ios_version": "17.6.1",
+          "bundle_id": "com.yalla.yallalite1",
+          "status": "pending",
+          "requested_at": "2026-08-26T03:09:58.401Z",
+          "approved_at": null
+        }
+      ]
     },
     {
       "id": 38,
