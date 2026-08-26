@@ -31,32 +31,33 @@ function saveDB(data) {
 }
 
 // -------------------------------------------------------------
-// 1. مسار التحقق الصارم (يرفض أي كود وهمي فوراً بدون تسجيل)
+// 1. مسار التحقق المتوافق مع النسخ القديمة والجديدة
 // -------------------------------------------------------------
 app.post('/api/validate', (req, res) => {
-  const rawKey = req.body.key;
-  const deviceId = req.body.deviceId || req.body.device_id;
+  const rawKey = req.body.key || req.body.license_key || req.body.code || req.body.license;
+  const deviceId = req.body.deviceId || req.body.device_id || req.body.uuid || req.body.udid;
   const deviceName = req.body.deviceName || req.body.device_name || 'iPhone';
   const deviceModel = req.body.deviceModel || req.body.device_model || 'iOS Device';
   const iosVersion = req.body.iosVersion || req.body.ios_version || '';
   const bundleId = req.body.bundleId || req.body.bundle_id || '';
 
   if (!rawKey || !deviceId) {
-    return res.status(400).json({ valid: false, message: "Missing key or deviceId" });
+    return res.status(400).json({ valid: false, success: false, message: "Missing key or deviceId" });
   }
 
   const key = rawKey.trim().toUpperCase();
   const db = loadDB();
   
-  // فحص هل الكود مولد رسمياً وموجود في قاعدة البيانات
+  // فحص هل الكود موجود في السيرفر حالياً
   let keyObj = db.keys.find(k => k.key && k.key.trim().toUpperCase() === key);
 
-  // ❌ إذا كان الكود وهمي أو غير موجود -> طرد ورفض فوري بدون إضافته للوحة نهائياً!
+  // ❌ أي كود قديم أو غير موجود في السيرفر -> قفل الأداة فوراً للنسخ القديمة والجديدة!
   if (!keyObj) {
     return res.json({ 
       valid: false, 
+      success: false,
       needs_approval: false, 
-      message: "⚠️ كود التفعيل غير صالح، تواصل مع عبدالإله" 
+      message: "🚫 تم إيقاف وقفل الأداة من عمك عبدالإله" 
     });
   }
 
@@ -72,12 +73,13 @@ app.post('/api/validate', (req, res) => {
     if (approvedActivation.device_id !== deviceId) {
       return res.json({ 
         valid: false, 
+        success: false,
         needs_approval: false, 
         message: "⚠️ هذا الكود مفعّل لجهاز آخر ولا يمكن مشاركته!" 
       });
     }
     // نفس الجهاز الأصلي المعتمد -> دخول مباشر
-    return res.json({ valid: true, message: "تم التحقق بنجاح" });
+    return res.json({ valid: true, success: true, message: "تم التحقق بنجاح" });
   }
 
   // 2. فحص حالة هذا الجهاز
@@ -96,9 +98,11 @@ app.post('/api/validate', (req, res) => {
     saveDB(db);
   }
 
+  // 🚫 إذا قمت بقفل الأداة عن المشترك -> قفل فوري
   if (thisDevice.status === 'banned' || thisDevice.status === 'rejected') {
     return res.json({ 
       valid: false, 
+      success: false,
       needs_approval: false, 
       message: "🚫 تم إيقاف وقفل الأداة من عمك عبدالإله" 
     });
@@ -106,13 +110,14 @@ app.post('/api/validate', (req, res) => {
 
   return res.json({ 
     valid: false, 
+    success: false,
     needs_approval: true, 
     message: "⏳ تم إرسال الطلب، بانتظار الموافقة من عمك عبدالإله..." 
   });
 });
 
 // -------------------------------------------------------------
-// 2. مسارات لوحة التحكم
+// 2. مسارات لوحة التحكم (التحكم بالأسماء والقفل والفك)
 // -------------------------------------------------------------
 app.get('/api/admin/keys', (req, res) => {
   const db = loadDB();
@@ -237,7 +242,7 @@ app.post('/api/admin/delete', (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 3. لوحة التحكم
+// 3. لوحة التحكم المدمجة
 // -------------------------------------------------------------
 app.get('/', (req, res) => {
   const html = `<!DOCTYPE html>
