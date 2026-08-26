@@ -31,7 +31,7 @@ function saveDB(data) {
 }
 
 // -------------------------------------------------------------
-// 1. مسار التحقق الصارم (1 Key = 1 Device Only)
+// 1. مسار التحقق الصارم والمباشر
 // -------------------------------------------------------------
 app.post('/api/validate', (req, res) => {
   const rawKey = req.body.key;
@@ -49,12 +49,11 @@ app.post('/api/validate', (req, res) => {
   const db = loadDB();
   let keyObj = db.keys.find(k => k.key && k.key.trim().toUpperCase() === key);
 
-  // إذا كان الكود قديماً وموزعاً سابقاً، يتم تسجيله وحفظه تلقائياً
   if (!keyObj) {
     keyObj = {
       key: key,
       client_name: 'مشترك سابق',
-      notes: 'كود تم استيراده تلقائياً',
+      notes: 'كود مسجل تلقائياً',
       created_at: new Date().toISOString(),
       activations: []
     };
@@ -66,11 +65,11 @@ app.post('/api/validate', (req, res) => {
     keyObj.activations = [];
   }
 
-  // 1. فحص هل هناك جهاز مفعل وموافق عليه
+  // 1. فحص هل هناك جهاز مفعل
   const approvedActivation = keyObj.activations.find(a => a.status === 'approved');
 
   if (approvedActivation) {
-    // 🔒 إذا حاول جهاز آخر استخدام نفس الكود -> حظر وطرد فوري!
+    // 🔒 إذا حاول جهاز ثانٍ استخدام نفس الكود -> حظر فوري
     if (approvedActivation.device_id !== deviceId) {
       return res.json({ 
         valid: false, 
@@ -78,7 +77,7 @@ app.post('/api/validate', (req, res) => {
         message: "⚠️ هذا الكود مفعّل لجهاز آخر ولا يمكن مشاركته!" 
       });
     }
-    // الجهاز المعتمد الأصلي
+    // الجهاز المعتمد
     return res.json({ valid: true, message: "تم التحقق بنجاح" });
   }
 
@@ -98,23 +97,23 @@ app.post('/api/validate', (req, res) => {
     saveDB(db);
   }
 
-  if (thisDevice.status === 'rejected' || thisDevice.status === 'banned') {
+  if (thisDevice.status === 'banned' || thisDevice.status === 'rejected') {
     return res.json({ 
       valid: false, 
       needs_approval: false,
-      message: "🚫 تم إيقاف وقفل هذا الترخيص من قِبل الإدارة" 
+      message: "🚫 تم إيقاف وقفل الأداة من عمك عبدالإله" 
     });
   }
 
   return res.json({ 
     valid: false, 
     needs_approval: true, 
-    message: "تم إرسال الطلب، بانتظار موافقة الإدارة من لوحة التحكم" 
+    message: "⏳ تم إرسال الطلب، بانتظار الموافقة من عمك عبدالإله..." 
   });
 });
 
 // -------------------------------------------------------------
-// 2. مسارات لوحة التحكم وإدارة المشتركين
+// 2. مسارات لوحة التحكم
 // -------------------------------------------------------------
 app.get('/api/admin/keys', (req, res) => {
   const db = loadDB();
@@ -177,7 +176,7 @@ app.post('/api/admin/approve', (req, res) => {
         a.status = 'approved';
         a.approved_at = new Date().toISOString();
       } else {
-        a.status = 'rejected';
+        a.status = 'banned';
       }
     });
     saveDB(db);
@@ -239,7 +238,7 @@ app.post('/api/admin/delete', (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 3. لوحة تحكم عبدالإله الفخمة المدمجة
+// 3. لوحة التحكم المدمجة
 // -------------------------------------------------------------
 app.get('/', (req, res) => {
   const html = `<!DOCTYPE html>
