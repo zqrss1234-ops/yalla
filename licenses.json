@@ -724,6 +724,16 @@
           "status": "approved",
           "requested_at": "2026-08-26T03:03:25.716Z",
           "approved_at": "2026-08-26T03:03:25.727Z"
+        },
+        {
+          "device_id": "892F0E70-71D7-4442-875C-52BA42F0C9C8",
+          "device_name": "‏iPhone ‏Hadi (2)",
+          "device_model": "iPhone11,2",
+          "ios_version": "15.5",
+          "bundle_id": "com.yahya.clone.mt9ilrjvf5bb",
+          "status": "pending",
+          "requested_at": "2026-08-26T03:09:35.757Z",
+          "approved_at": null
         }
       ]
     },
