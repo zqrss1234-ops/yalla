@@ -11,14 +11,14 @@ const DB_FILE = path.join(__dirname, 'database.json');
 
 function loadDB() {
   if (!fs.existsSync(DB_FILE)) {
-    const init = { keys: [], adminToken: "admin123456" };
+    const init = { keys: [] };
     fs.writeFileSync(DB_FILE, JSON.stringify(init, null, 2));
     return init;
   }
   try {
     return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
   } catch (e) {
-    return { keys: [], adminToken: "admin123456" };
+    return { keys: [] };
   }
 }
 
@@ -27,34 +27,44 @@ function saveDB(data) {
 }
 
 // -------------------------------------------------------------
-// 1. API: التحقق من التفعيل (1 Key = 1 Device Only)
+// 1. مسار الفحص الذكي (يقفل أي كود قديم أو جديد على أول جهاز فقط)
 // -------------------------------------------------------------
 app.post('/api/validate', (req, res) => {
-  const key = req.body.key;
+  const rawKey = req.body.key;
   const deviceId = req.body.deviceId || req.body.device_id;
   const deviceName = req.body.deviceName || req.body.device_name || 'iPhone';
   const deviceModel = req.body.deviceModel || req.body.device_model || 'iOS Device';
   const iosVersion = req.body.iosVersion || req.body.ios_version || '';
   const bundleId = req.body.bundleId || req.body.bundle_id || '';
 
-  if (!key || !deviceId) {
+  if (!rawKey || !deviceId) {
     return res.status(400).json({ valid: false, message: "Missing key or deviceId" });
   }
 
+  const key = rawKey.trim().toUpperCase();
   const db = loadDB();
-  const keyObj = db.keys.find(k => k.key && k.key.trim().toUpperCase() === key.trim().toUpperCase());
+  let keyObj = db.keys.find(k => k.key && k.key.trim().toUpperCase() === key);
 
+  // إذا كان الكود قديماً وموزعاً مسبقاً، يتم تسجيله فوراً في قاعدة البيانات
   if (!keyObj) {
-    return res.json({ valid: false, message: "كود التفعيل غير صالح" });
+    keyObj = {
+      key: key,
+      created_at: new Date().toISOString(),
+      activations: []
+    };
+    db.keys.unshift(keyObj);
+    saveDB(db);
   }
 
   if (!keyObj.activations) {
     keyObj.activations = [];
   }
 
+  // 1. فحص هل هناك جهاز مفعل وموافق عليه لهذا الكود
   const approvedActivation = keyObj.activations.find(a => a.status === 'approved');
 
   if (approvedActivation) {
+    // 🔒 إذا كان الكود مفعل لجهاز آخر مختلف -> حظر وطرد فوري!
     if (approvedActivation.device_id !== deviceId) {
       return res.json({ 
         valid: false, 
@@ -62,9 +72,11 @@ app.post('/api/validate', (req, res) => {
         message: "⚠️ هذا الكود مفعّل لجهاز آخر ولا يمكن مشاركته!" 
       });
     }
+    // نفس الجهاز المصرح له -> دخول مباشر
     return res.json({ valid: true, message: "تم التحقق بنجاح" });
   }
 
+  // 2. فحص حالة هذا الجهاز
   let thisDevice = keyObj.activations.find(a => a.device_id === deviceId);
   if (!thisDevice) {
     thisDevice = {
@@ -81,7 +93,11 @@ app.post('/api/validate', (req, res) => {
   }
 
   if (thisDevice.status === 'rejected') {
-    return res.json({ valid: false, message: "تم رفض هذا الجهاز من قِبل الإدارة" });
+    return res.json({ 
+      valid: false, 
+      needs_approval: false,
+      message: "🚫 تم إيقاف هذا الترخيص من قِبل الإدارة" 
+    });
   }
 
   return res.json({ 
@@ -144,7 +160,7 @@ app.post('/api/admin/approve', (req, res) => {
   const { key, deviceId } = req.body;
   const targetDeviceId = deviceId || req.body.device_id;
   const db = loadDB();
-  const keyObj = db.keys.find(k => k.key === key);
+  const keyObj = db.keys.find(k => k.key && k.key.trim().toUpperCase() === (key || '').trim().toUpperCase());
   if (keyObj && keyObj.activations) {
     keyObj.activations.forEach(a => {
       if (a.device_id === targetDeviceId) {
@@ -163,7 +179,7 @@ app.post('/api/admin/reject', (req, res) => {
   const { key, deviceId } = req.body;
   const targetDeviceId = deviceId || req.body.device_id;
   const db = loadDB();
-  const keyObj = db.keys.find(k => k.key === key);
+  const keyObj = db.keys.find(k => k.key && k.key.trim().toUpperCase() === (key || '').trim().toUpperCase());
   if (keyObj && keyObj.activations) {
     const act = keyObj.activations.find(a => a.device_id === targetDeviceId);
     if (act) act.status = 'rejected';
@@ -176,7 +192,7 @@ app.post('/api/admin/revoke', (req, res) => {
   const { key, deviceId } = req.body;
   const targetDeviceId = deviceId || req.body.device_id;
   const db = loadDB();
-  const keyObj = db.keys.find(k => k.key === key);
+  const keyObj = db.keys.find(k => k.key && k.key.trim().toUpperCase() === (key || '').trim().toUpperCase());
   if (keyObj && keyObj.activations) {
     const act = keyObj.activations.find(a => a.device_id === targetDeviceId);
     if (act) act.status = 'rejected';
@@ -188,13 +204,13 @@ app.post('/api/admin/revoke', (req, res) => {
 app.post('/api/admin/delete', (req, res) => {
   const { key } = req.body;
   const db = loadDB();
-  db.keys = db.keys.filter(k => k.key !== key);
+  db.keys = db.keys.filter(k => k.key && k.key.trim().toUpperCase() !== (key || '').trim().toUpperCase());
   saveDB(db);
   res.json({ success: true });
 });
 
 // -------------------------------------------------------------
-// 3. لوحة التحكم المدمجة الكاملة (Embedded Dashboard HTML)
+// 3. لوحة التحكم المدمجة
 // -------------------------------------------------------------
 app.get('/', (req, res) => {
   const html = `<!DOCTYPE html>
