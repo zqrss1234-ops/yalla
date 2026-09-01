@@ -7,15 +7,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// =========================================================================
-// 🔒 إعدادات الحماية القصوى والسرية الكاملة (خاصة بك وحدك)
-// =========================================================================
-
-// 1. رمز الأدمن السري (غيّره لكلمة سر قوية خاصة بك فقط)
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "Abod_Sniper_Master_2026_Secure_Key_!@#";
-
-// 2. المسار السري للوحة التحكم (فقط أنت من يعرف هذا الرابط للدخول للوحة)
-const SECRET_DASHBOARD_PATH = "/abod-vault-998877";
+// ⚠️ كلمة السر الخاصة بك للدخول (يمكنك تغييرها لأي كلمة سر تريدها)
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "abod2026";
 
 const DB_FILE = path.join(__dirname, 'database.json');
 
@@ -36,21 +29,21 @@ function saveDB(data) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
-// ميدلوير لحماية جميع روابط لوحة التحكم والأدمن
+// حماية مسارات الأدمن من أي وصول غير مصرح
 function requireAdminAuth(req, res, next) {
   const authHeader = req.headers['authorization'] || req.headers['x-admin-token'] || req.query.token;
   if (!authHeader) {
-    return res.status(404).send("Cannot GET " + req.url); // يظهر خطأ 404 لإيهام المتطفل بأن الرابط غير موجود
+    return res.status(401).json({ success: false, message: "🚫 غير مصرح" });
   }
   const token = authHeader.replace('Bearer ', '').trim();
   if (token !== ADMIN_TOKEN) {
-    return res.status(404).send("Cannot GET " + req.url);
+    return res.status(403).json({ success: false, message: "⛔ رمز الأدمن غير صحيح" });
   }
   next();
 }
 
 // -------------------------------------------------------------
-// 1. API: التحقق من التفعيل (1 Key = 1 Device - Persistent)
+// 1. API: التحقق من التفعيل (1 Key = 1 Device)
 // -------------------------------------------------------------
 app.post('/api/validate', (req, res) => {
   const key = req.body.key;
@@ -76,15 +69,11 @@ app.post('/api/validate', (req, res) => {
     keyObj.activations = [];
   }
 
-  // 1. هل الجهاز مسجل مسبقاً لهذا الكود؟
   let thisDevice = keyObj.activations.find(a => a.device_id === deviceId);
 
   if (thisDevice) {
     if (thisDevice.status === 'rejected' || thisDevice.status === 'blocked') {
-      return res.json({ 
-        valid: false, 
-        message: "🚫 تم إيقاف وقفل الأداة من قِبل الإدارة" 
-      });
+      return res.json({ valid: false, message: "🚫 تم إيقاف وقفل الأداة من قِبل الإدارة" });
     }
     
     if (thisDevice.status === 'approved') {
@@ -93,30 +82,17 @@ app.post('/api/validate', (req, res) => {
       thisDevice.device_model = deviceModel;
       thisDevice.ios_version = iosVersion;
       saveDB(db);
-      return res.json({ 
-        valid: true, 
-        message: "✅ تم التحقق وتفعيل الجهاز بنجاح" 
-      });
+      return res.json({ valid: true, message: "✅ تم التحقق وتفعيل الجهاز بنجاح" });
     }
 
-    return res.json({ 
-      valid: false, 
-      needs_approval: true, 
-      message: "⏳ بانتظار الموافقة على جهازك من لوحة التحكم" 
-    });
+    return res.json({ valid: false, needs_approval: true, message: "⏳ بانتظار الموافقة على جهازك من لوحة التحكم" });
   }
 
-  // 2. هل الكود مستخدم ومفعّل لجهاز آخر؟ (1 Key = 1 Device)
   const approvedOnOtherDevice = keyObj.activations.find(a => a.status === 'approved' && a.device_id !== deviceId);
   if (approvedOnOtherDevice) {
-    return res.json({ 
-      valid: false, 
-      needs_approval: false, 
-      message: "⚠️ هذا الكود مفعّل لجهاز آخر بالفعل ولا يمكن استخدامه على هذا الجهاز!" 
-    });
+    return res.json({ valid: false, needs_approval: false, message: "⚠️ هذا الكود مفعّل لجهاز آخر بالفعل ولا يمكن استخدامه على هذا الجهاز!" });
   }
 
-  // 3. تسجيل الجهاز الجديد وتفعيله فورياً
   const newActivation = {
     device_id: deviceId,
     device_name: deviceName,
@@ -132,14 +108,11 @@ app.post('/api/validate', (req, res) => {
   keyObj.activations.push(newActivation);
   saveDB(db);
 
-  return res.json({ 
-    valid: true, 
-    message: "👑 تم تفعيل وحفظ جهازك بنجاح!" 
-  });
+  return res.json({ valid: true, message: "👑 تم تفعيل وحفظ جهازك بنجاح!" });
 });
 
 // -------------------------------------------------------------
-// 2. Admin APIs: التحكم والتجميد وإدارة الأكواد (مقفلة ومموهة)
+// 2. Admin APIs: التحكم بالأكواد
 // -------------------------------------------------------------
 app.get('/api/admin/keys', requireAdminAuth, (req, res) => {
   const db = loadDB();
@@ -200,7 +173,7 @@ app.post('/api/admin/lock', requireAdminAuth, (req, res) => {
     }
     saveDB(db);
   }
-  res.json({ success: true, message: "تم قفل الأداة عن هذا الجهاز فورياً" });
+  res.json({ success: true, message: "تم قفل الأداة عن هذا الجهاز" });
 });
 
 app.post('/api/admin/unlock', requireAdminAuth, (req, res) => {
@@ -219,38 +192,6 @@ app.post('/api/admin/unlock', requireAdminAuth, (req, res) => {
   res.json({ success: true, message: "تم فتح وتفعيل الأداة لهذا الجهاز" });
 });
 
-app.post('/api/admin/approve', requireAdminAuth, (req, res) => {
-  const { key, deviceId } = req.body;
-  const targetDeviceId = deviceId || req.body.device_id;
-  const db = loadDB();
-  const keyObj = db.keys.find(k => k.key === key);
-  if (keyObj && keyObj.activations) {
-    const act = keyObj.activations.find(a => a.device_id === targetDeviceId);
-    if (act) {
-      act.status = 'approved';
-      act.approved_at = new Date().toISOString();
-    }
-    saveDB(db);
-  }
-  res.json({ success: true, message: "تمت الموافقة وتفعيل الجهاز" });
-});
-
-app.post('/api/admin/reject', requireAdminAuth, (req, res) => {
-  const { key, deviceId } = req.body;
-  const targetDeviceId = deviceId || req.body.device_id;
-  const db = loadDB();
-  const keyObj = db.keys.find(k => k.key === key);
-  if (keyObj && keyObj.activations) {
-    const act = keyObj.activations.find(a => a.device_id === targetDeviceId);
-    if (act) {
-      act.status = 'rejected';
-      act.rejected_at = new Date().toISOString();
-    }
-    saveDB(db);
-  }
-  res.json({ success: true, message: "تم رفض الجهاز" });
-});
-
 app.post('/api/admin/delete', requireAdminAuth, (req, res) => {
   const { key } = req.body;
   const db = loadDB();
@@ -259,28 +200,10 @@ app.post('/api/admin/delete', requireAdminAuth, (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/admin/reset', requireAdminAuth, (req, res) => {
-  const { key } = req.body;
-  const db = loadDB();
-  const keyObj = db.keys.find(k => k.key === key);
-  if (keyObj) {
-    keyObj.activations = [];
-    saveDB(db);
-  }
-  res.json({ success: true, message: "تم مسح ارتباط الجهاز وإتاحة الكود" });
-});
-
 // -------------------------------------------------------------
-// 3. التمويه الكامل: الصفحة الرئيسية تظهر 404 (كأن الموقع غير موجود)
+// 3. لوحة التحكم المباشرة
 // -------------------------------------------------------------
 app.get('/', (req, res) => {
-  res.status(404).send(`<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="background:#fff;color:#222;font-family:sans-serif;padding:40px;text-align:center;"><h1>404 Not Found</h1><hr><p style="color:#777;">nginx/1.24.0 (Ubuntu)</p></body></html>`);
-});
-
-// -------------------------------------------------------------
-// 4. المسار السري الخاص بك فقط للوحة التحكم الذهبية
-// -------------------------------------------------------------
-app.get(SECRET_DASHBOARD_PATH, (req, res) => {
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -305,71 +228,48 @@ app.get(SECRET_DASHBOARD_PATH, (req, res) => {
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Tajawal', sans-serif; }
   body { background: var(--bg-dark); color: var(--text); padding: 20px; min-height: 100vh; }
   .container { max-width: 1200px; margin: 0 auto; }
-  
   header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
-  .logo-title { display: flex; align-items: center; gap: 12px; }
   .logo-title h1 { font-size: 26px; color: var(--gold-light); font-weight: 800; }
   .status-tag { background: rgba(46, 204, 113, 0.15); color: var(--green); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; border: 1px solid rgba(46, 204, 113, 0.3); }
-
   .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-bottom: 30px; }
-  .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; position: relative; overflow: hidden; }
+  .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 20px; text-align: center; }
   .stat-card .num { font-size: 34px; font-weight: 800; color: #fff; margin-bottom: 6px; }
-  .stat-card .label { font-size: 14px; color: var(--text-muted); font-weight: 500; }
-  .stat-card.pending { border-color: rgba(230, 126, 34, 0.4); }
-  .stat-card.pending .num { color: var(--orange); }
-  .stat-card.active { border-color: rgba(46, 204, 113, 0.4); }
+  .stat-card .label { font-size: 14px; color: var(--text-muted); }
   .stat-card.active .num { color: var(--green); }
-
-  .actions-bar { display: flex; gap: 12px; margin-bottom: 25px; flex-wrap: wrap; }
-  .btn { padding: 12px 22px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; border: none; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; }
-  .btn-gold { background: linear-gradient(135deg, var(--gold), #aa820a); color: #000; box-shadow: 0 4px 15px rgba(212, 175, 55, 0.25); }
-  .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4); }
+  .btn { padding: 12px 22px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; border: none; }
+  .btn-gold { background: linear-gradient(135deg, var(--gold), #aa820a); color: #000; }
   .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
-  .btn-outline:hover { background: var(--border); }
-
   .gen-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 22px; margin-bottom: 25px; display: none; }
   .gen-box.show { display: block; }
-  .gen-inputs { display: flex; gap: 12px; align-items: center; margin-top: 15px; }
   .input { background: #0b0c10; border: 1px solid var(--border); color: #fff; padding: 12px 16px; border-radius: 10px; font-size: 15px; }
   .input:focus { border-color: var(--gold); outline: none; }
-  .gen-results { margin-top: 15px; padding: 15px; background: #000; border-radius: 10px; font-family: monospace; color: var(--gold-light); font-size: 14px; line-height: 1.8; max-height: 180px; overflow-y: auto; display: none; }
-
+  .gen-results { margin-top: 15px; padding: 15px; background: #000; border-radius: 10px; font-family: monospace; color: var(--gold-light); font-size: 14px; line-height: 1.8; display: none; }
   .table-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
   .table-header { padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-  .table-header h2 { font-size: 18px; color: #fff; }
   table { width: 100%; border-collapse: collapse; text-align: right; }
-  th { background: #0e1017; padding: 14px 18px; font-size: 13px; color: var(--text-muted); font-weight: 700; border-bottom: 1px solid var(--border); }
-  td { padding: 16px 18px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  tr:hover { background: rgba(255, 255, 255, 0.02); }
-  
-  .badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; }
+  th { background: #0e1017; padding: 14px 18px; font-size: 13px; color: var(--text-muted); }
+  td { padding: 16px 18px; font-size: 14px; border-bottom: 1px solid var(--border); }
+  .badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
   .badge-approved { background: rgba(46, 204, 113, 0.15); color: var(--green); }
-  .badge-pending { background: rgba(230, 126, 34, 0.15); color: var(--orange); }
   .badge-rejected { background: rgba(231, 76, 60, 0.15); color: var(--red); }
   .badge-unused { background: rgba(136, 146, 176, 0.15); color: var(--text-muted); }
-
   .act-btn { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; border: none; margin-left: 6px; }
-  .btn-approve { background: var(--green); color: #000; }
-  .btn-reject { background: var(--red); color: #fff; }
-  .btn-revoke { background: var(--orange); color: #fff; }
   .btn-del { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-  .btn-del:hover { color: var(--red); border-color: var(--red); }
-
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-success { background: var(--green); color: #000; }
   .key-tag { font-family: monospace; background: #000; padding: 4px 10px; border-radius: 6px; color: var(--gold-light); font-weight: 700; }
-
-  /* Login Modal */
   #loginModal { position: fixed; inset: 0; background: rgba(0,0,0,0.92); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-  #loginBox { background: var(--card-bg); padding: 36px; border-radius: 20px; border: 1px solid var(--gold); width: 380px; text-align: center; box-shadow: 0 10px 35px rgba(212, 175, 55, 0.2); }
+  #loginBox { background: var(--card-bg); padding: 36px; border-radius: 20px; border: 1px solid var(--gold); width: 360px; text-align: center; }
 </style>
 </head>
 <body>
 
 <div id="loginModal">
   <div id="loginBox">
-    <h2 style="color:var(--gold); margin-bottom:10px;">👑 تسجيل دخول المسؤول</h2>
-    <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:20px;">أدخل رمز الإدارة السري للوصول للوحة التحكم</p>
-    <input type="password" id="adminTokenInput" class="input" placeholder="رمز الإدارة السري..." style="width:100%; margin-bottom:15px; text-align:center;">
-    <button class="btn btn-gold" onclick="login()" style="width:100%; justify-content:center;">دخول إلى اللوحة</button>
+    <h2 style="color:var(--gold); margin-bottom:10px;">👑 لوحة تحكم عبدالإله</h2>
+    <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:20px;">أدخل كلمة السر لفتح اللوحة</p>
+    <input type="password" id="adminTokenInput" class="input" placeholder="كلمة السر..." style="width:100%; margin-bottom:15px; text-align:center;" onkeydown="if(event.key==='Enter') login()">
+    <button class="btn btn-gold" onclick="login()" style="width:100%;">دخول إلى اللوحة</button>
   </div>
 </div>
 
@@ -386,10 +286,6 @@ app.get(SECRET_DASHBOARD_PATH, (req, res) => {
   </header>
 
   <div class="stats-grid">
-    <div class="stat-card pending">
-      <div class="num" id="statPending">0</div>
-      <div class="label">بانتظار الموافقة</div>
-    </div>
     <div class="stat-card active">
       <div class="num" id="statApproved">0</div>
       <div class="label">الأجهزة المفعلة</div>
@@ -400,17 +296,17 @@ app.get(SECRET_DASHBOARD_PATH, (req, res) => {
     </div>
     <div class="stat-card">
       <div class="num" id="statRejected">0</div>
-      <div class="label">المرفوضة / المقفلة</div>
+      <div class="label">المقفلة / المحظورة</div>
     </div>
   </div>
 
-  <div class="actions-bar">
+  <div class="actions-bar" style="margin-bottom:20px;">
     <button class="btn btn-gold" onclick="toggleGen()">➕ توليد أكواد جديدة</button>
   </div>
 
   <div class="gen-box" id="genBox">
     <h3>توليد مفاتيح تفعيل جديدة</h3>
-    <div class="gen-inputs">
+    <div style="display:flex; gap:12px; margin-top:15px;">
       <input type="number" id="genCount" class="input" value="1" min="1" max="100" style="width: 100px;">
       <button class="btn btn-gold" onclick="generateKeys()">توليد الآن</button>
     </div>
@@ -420,7 +316,7 @@ app.get(SECRET_DASHBOARD_PATH, (req, res) => {
   <div class="table-card">
     <div class="table-header">
       <h2>قائمة الأكواد والأجهزة المسجلة</h2>
-      <input type="text" id="search" class="input" placeholder="بحث عن كود أو جهاز..." oninput="filterRows()" style="width: 250px;">
+      <input type="text" id="search" class="input" placeholder="بحث..." oninput="filterRows()" style="width: 220px;">
     </div>
     <table>
       <thead>
@@ -428,14 +324,11 @@ app.get(SECRET_DASHBOARD_PATH, (req, res) => {
           <th>كود التفعيل</th>
           <th>الحالة</th>
           <th>معلومات الجهاز</th>
-          <th>المعرف (UUID)</th>
-          <th>تاريخ الإنشاء</th>
+          <th>المعرف</th>
           <th>الإجراءات</th>
         </tr>
       </thead>
-      <tbody id="tableBody">
-        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">جاري تحميل البيانات...</td></tr>
-      </tbody>
+      <tbody id="tableBody"></tbody>
     </table>
   </div>
 </div>
@@ -450,7 +343,7 @@ if (authToken) {
 
 function login() {
   const token = document.getElementById('adminTokenInput').value.trim();
-  if (!token) return alert('الرجاء كتابة رمز الأدمن');
+  if (!token) return alert('الرجاء كتابة كلمة السر');
   testAuth(token);
 }
 
@@ -471,41 +364,31 @@ async function testAuth(token) {
       document.getElementById('mainDashboard').style.display = 'block';
       loadData();
     } else {
-      alert('⛔ رمز الأدمن غير صحيح!');
+      alert('⛔ كلمة السر غير صحيحة!');
     }
   } catch (e) {
-    alert('حدث خطأ أثناء الاتصال بالسيرفر');
+    alert('حدث خطأ أثناء الاتصال');
   }
 }
 
 async function loadData() {
   try {
     const res = await fetch('/api/admin/keys', { headers: { 'Authorization': 'Bearer ' + authToken } });
-    if (!res.ok) {
-      logout();
-      return;
-    }
     const data = await res.json();
     allKeys = data.keys || [];
-    
-    document.getElementById('statPending').textContent = data.stats.pending || 0;
     document.getElementById('statApproved').textContent = data.stats.approved || 0;
     document.getElementById('statTotal').textContent = data.stats.total_keys || 0;
     document.getElementById('statRejected').textContent = data.stats.rejected || 0;
-
     renderTable(allKeys);
-  } catch (err) {
-    console.error(err);
-  }
+  } catch (err) {}
 }
 
 function renderTable(keys) {
   const tbody = document.getElementById('tableBody');
   if (keys.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">لا توجد أكواد حالياً، اضغط \"توليد أكواد جديدة\" في الأعلى</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 25px;">لا توجد أكواد حالياً</td></tr>';
     return;
   }
-
   let rowsHtml = '';
   keys.forEach(k => {
     const acts = k.activations || [];
@@ -515,44 +398,32 @@ function renderTable(keys) {
         <td><span class="badge badge-unused">غير مستخدم</span></td>
         <td>-</td>
         <td>-</td>
-        <td>\${new Date(k.created_at).toLocaleDateString('ar-SA')}</td>
         <td><button class="act-btn btn-del" onclick="deleteKey('\${k.key}')">حذف</button></td>
       </tr>\`;
     } else {
       acts.forEach(a => {
-        let badgeClass = 'badge-unused', badgeText = 'غير مستخدم';
-        let actButtons = '';
-
-        if (a.status === 'pending') {
-          badgeClass = 'badge-pending'; badgeText = 'بانتظار الموافقة';
-          actButtons = \`<button class="act-btn btn-approve" onclick="approveKey('\${k.key}', '\${a.device_id}')">موافقة</button>
-                        <button class="act-btn btn-reject" onclick="rejectKey('\${k.key}', '\${a.device_id}')">رفض</button>\`;
-        } else if (a.status === 'approved') {
-          badgeClass = 'badge-approved'; badgeText = 'مفعل';
-          actButtons = \`<button class="act-btn btn-revoke" onclick="lockKey('\${k.key}', '\${a.device_id}')">قفل الأداة</button>\`;
-        } else if (a.status === 'rejected' || a.status === 'blocked') {
-          badgeClass = 'badge-rejected'; badgeText = 'مقفل / محظور';
-          actButtons = \`<button class="act-btn btn-approve" onclick="unlockKey('\${k.key}', '\${a.device_id}')">إعادة تفعيل</button>\`;
-        }
+        let isBlocked = a.status === 'blocked' || a.status === 'rejected';
+        let badgeClass = isBlocked ? 'badge-rejected' : 'badge-approved';
+        let badgeText = isBlocked ? 'مقفل' : 'مفعل';
+        let lockBtn = isBlocked ? 
+          \`<button class=\"act-btn btn-success\" onclick=\"unlockKey('\${k.key}', '\${a.device_id}')\">فك القفل</button>\` : 
+          \`<button class=\"act-btn btn-danger\" onclick=\"lockKey('\${k.key}', '\${a.device_id}')\">قفل الأداة</button>\`;
 
         rowsHtml += \`<tr>
           <td><span class="key-tag">\${k.key}</span></td>
           <td><span class="badge \${badgeClass}">\${badgeText}</span></td>
           <td><strong>\${a.device_name || 'iPhone'}</strong> (\${a.device_model || 'iOS'})</td>
           <td style="font-family: monospace; font-size: 12px; color: var(--text-muted);">\${a.device_id ? a.device_id.substring(0, 14) + '...' : '-'}</td>
-          <td>\${new Date(k.created_at).toLocaleDateString('ar-SA')}</td>
-          <td>\${actButtons} <button class="act-btn btn-del" onclick="deleteKey('\${k.key}')">حذف</button></td>
+          <td>\${lockBtn} <button class="act-btn btn-del" onclick="deleteKey('\${k.key}')">حذف</button></td>
         </tr>\`;
       });
     }
   });
-
   tbody.innerHTML = rowsHtml;
 }
 
 function toggleGen() {
-  const box = document.getElementById('genBox');
-  box.classList.toggle('show');
+  document.getElementById('genBox').classList.toggle('show');
 }
 
 async function generateKeys() {
@@ -587,26 +458,8 @@ async function unlockKey(key, deviceId) {
   loadData();
 }
 
-async function approveKey(key, deviceId) {
-  await fetch('/api/admin/approve', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-    body: JSON.stringify({ key, deviceId })
-  });
-  loadData();
-}
-
-async function rejectKey(key, deviceId) {
-  await fetch('/api/admin/reject', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-    body: JSON.stringify({ key, deviceId })
-  });
-  loadData();
-}
-
 async function deleteKey(key) {
-  if (!confirm('هل أنت متأكد من حذف هذا الكود نهائياً؟')) return;
+  if (!confirm('حذف هذا الكود نهائياً؟')) return;
   await fetch('/api/admin/delete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
@@ -617,13 +470,7 @@ async function deleteKey(key) {
 
 function filterRows() {
   const q = document.getElementById('search').value.toLowerCase();
-  const filtered = allKeys.filter(k => {
-    if (k.key.toLowerCase().includes(q)) return true;
-    return (k.activations || []).some(a => 
-      (a.device_name && a.device_name.toLowerCase().includes(q)) ||
-      (a.device_id && a.device_id.toLowerCase().includes(q))
-    );
-  });
+  const filtered = allKeys.filter(k => k.key.toLowerCase().includes(q));
   renderTable(filtered);
 }
 </script>
@@ -634,5 +481,5 @@ function filterRows() {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running securely on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
