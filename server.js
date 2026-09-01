@@ -7,8 +7,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ⚠️ الرمز السري الخاص بك للدخول للوحة التحكم
+// =========================================================================
+// 🔒 إعدادات الحماية القصوى والسرية الكاملة (خاصة بك وحدك)
+// =========================================================================
+
+// 1. رمز الأدمن السري (غيّره لكلمة سر قوية خاصة بك فقط)
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "Abod_Sniper_Master_2026_Secure_Key_!@#";
+
+// 2. المسار السري للوحة التحكم (فقط أنت من يعرف هذا الرابط للدخول للوحة)
+const SECRET_DASHBOARD_PATH = "/abod-vault-998877";
 
 const DB_FILE = path.join(__dirname, 'database.json');
 
@@ -33,11 +40,11 @@ function saveDB(data) {
 function requireAdminAuth(req, res, next) {
   const authHeader = req.headers['authorization'] || req.headers['x-admin-token'] || req.query.token;
   if (!authHeader) {
-    return res.status(401).json({ success: false, message: "🚫 غير مصرح: يرجى تقديم رمز الإدارة" });
+    return res.status(404).send("Cannot GET " + req.url); // يظهر خطأ 404 لإيهام المتطفل بأن الرابط غير موجود
   }
   const token = authHeader.replace('Bearer ', '').trim();
   if (token !== ADMIN_TOKEN) {
-    return res.status(403).json({ success: false, message: "⛔ رمز الإدارة غير صحيح" });
+    return res.status(404).send("Cannot GET " + req.url);
   }
   next();
 }
@@ -132,7 +139,7 @@ app.post('/api/validate', (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 2. Admin APIs: التحكم والتجميد وإدارة الأكواد (محمية 100%)
+// 2. Admin APIs: التحكم والتجميد وإدارة الأكواد (مقفلة ومموهة)
 // -------------------------------------------------------------
 app.get('/api/admin/keys', requireAdminAuth, (req, res) => {
   const db = loadDB();
@@ -264,9 +271,16 @@ app.post('/api/admin/reset', requireAdminAuth, (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 3. لوحة التحكم المدمجة الكاملة والفاخرة (Web Dashboard HTML)
+// 3. التمويه الكامل: الصفحة الرئيسية تظهر 404 (كأن الموقع غير موجود)
 // -------------------------------------------------------------
 app.get('/', (req, res) => {
+  res.status(404).send(`<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="background:#fff;color:#222;font-family:sans-serif;padding:40px;text-align:center;"><h1>404 Not Found</h1><hr><p style="color:#777;">nginx/1.24.0 (Ubuntu)</p></body></html>`);
+});
+
+// -------------------------------------------------------------
+// 4. المسار السري الخاص بك فقط للوحة التحكم الذهبية
+// -------------------------------------------------------------
+app.get(SECRET_DASHBOARD_PATH, (req, res) => {
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
