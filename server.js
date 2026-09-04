@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
+app.set('trust proxy', true); // تمكين قراءة الآي بي الحقيقي لكل شخص خلف سيرفر Render
 app.use(cors());
 app.use(express.json());
 
@@ -20,6 +21,14 @@ const INITIAL_KEYS = [{"key":"YS-0OXS-FN9A","created_at":"2026-09-04T08:07:38.29
 
 // نظام الحماية من محاولات التخمين (Anti-Brute Force)
 const failedAttempts = new Map();
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+}
 
 function checkRateLimit(ip) {
   const record = failedAttempts.get(ip);
@@ -77,22 +86,27 @@ function saveDB(data) {
 
 // حماية مسارات الأدمن
 function requireAdminAuth(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  const ip = getClientIp(req);
+  const authHeader = req.headers['authorization'] || req.headers['x-admin-token'] || req.query.token;
+  const token = authHeader ? authHeader.replace('Bearer ', '').trim() : '';
+
+  // 👑 إذا أدخلت كلمة السر الصحيحة يتم إلغاء أي حظر مؤقت فوراً والدخول للوحة
+  if (token && token === ADMIN_TOKEN) {
+    clearFailedAttempts(ip);
+    return next();
+  }
+
+  // فحص الحظر إذا كانت المحاولات السابقة خاطئة
   if (!checkRateLimit(ip)) {
     return res.status(429).json({ success: false, message: "🚫 تم حظر هذا الاتصال مؤقتاً بسبب تكرار المحاولات الخاطئة" });
   }
 
-  const authHeader = req.headers['authorization'] || req.headers['x-admin-token'] || req.query.token;
-  if (!authHeader) {
+  if (!token) {
     return res.status(401).json({ success: false, message: "🚫 غير مصرح: يرجى كتابة رمز الأدمن" });
   }
-  const token = authHeader.replace('Bearer ', '').trim();
-  if (token !== ADMIN_TOKEN) {
-    recordFailedAttempt(ip);
-    return res.status(403).json({ success: false, message: "⛔ رمز الأدمن غير صحيح" });
-  }
-  clearFailedAttempts(ip);
-  next();
+
+  recordFailedAttempt(ip);
+  return res.status(403).json({ success: false, message: "⛔ رمز الأدمن غير صحيح" });
 }
 
 // -------------------------------------------------------------
