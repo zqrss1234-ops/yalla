@@ -263,7 +263,7 @@ app.post('/api/admin/generate', requireAdminAuth, (req, res) => {
 
   for (let i = 0; i < count; i++) {
     const part = () => Math.random().toString(36).substring(2, 6).toUpperCase();
-    const key = `ABOD-${part()}-${part()}-${part()}`;
+    const key = 'ABOD-' + part() + '-' + part() + '-' + part();
     const keyObj = {
       key: key,
       created_at: new Date().toISOString(),
@@ -332,7 +332,7 @@ app.post('/api/admin/reset', requireAdminAuth, (req, res) => {
 app.get('/api/admin/backup', requireAdminAuth, (req, res) => {
   const db = loadDB();
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Content-Disposition', `attachment; filename=keys_backup_${Date.now()}.json`);
+  res.setHeader('Content-Disposition', 'attachment; filename=keys_backup_' + Date.now() + '.json');
   res.send(JSON.stringify(db, null, 2));
 });
 
@@ -353,21 +353,21 @@ app.post('/api/admin/restore', requireAdminAuth, (req, res) => {
   });
 
   saveDB(db);
-  res.json({ success: true, message: `تم استعادة ودمج ${incomingData.keys.length} كود بنجاح!` });
+  res.json({ success: true, message: 'تم استعادة ودمج ' + incomingData.keys.length + ' كود بنجاح!' });
 });
 
 // -------------------------------------------------------------
 // 🕵️ 5. إخفاء الصفحة الرئيسية (Stealth Mode)
 // -------------------------------------------------------------
 app.get('/', (req, res) => {
-  res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1><p>The requested URL was not found on this server.</p></body></html>');
+  res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;"><h1>404 Not Found</h1><p>The requested URL / was not found on this server.</p><hr><address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server</address></body></html>');
 });
 
 // -------------------------------------------------------------
 // 👑 6. لوحة التحكم المشفرة على المسار السري الخاص بك فقط
 // -------------------------------------------------------------
-app.get(`/${ADMIN_PATH}`, (req, res) => {
-  const html = `<!DOCTYPE html>
+app.get('/' + ADMIN_PATH, (req, res) => {
+  res.send(`<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
@@ -499,7 +499,7 @@ app.get(`/${ADMIN_PATH}`, (req, res) => {
 
   <div class="actions-bar">
     <button class="btn btn-gold" onclick="toggleGen()">➕ توليد أكواد جديدة</button>
-    <span style="color:var(--text-muted); font-size:13px; margin-right:auto;">مسار اللوحة السري: <code style="color:var(--gold-light); background:#000; padding:3px 8px; border-radius:4px;">/${ADMIN_PATH}</code></span>
+    <span style="color:var(--text-muted); font-size:13px; margin-right:auto;">مسار اللوحة السري: <code style="color:var(--gold-light); background:#000; padding:3px 8px; border-radius:4px;">/` + ADMIN_PATH + `</code></span>
   </div>
 
   <div class="gen-box" id="genBox">
@@ -590,7 +590,7 @@ async function loadData() {
 function renderTable(keys) {
   const tbody = document.getElementById('tableBody');
   if (!keys || keys.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 35px;">لا توجد أكواد حالياً، اضغط \"توليد أكواد جديدة\" في الأعلى</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 35px;">لا توجد أكواد حالياً، اضغط \\"توليد أكواد جديدة\\" في الأعلى</td></tr>';
     return;
   }
 
@@ -598,14 +598,14 @@ function renderTable(keys) {
   keys.forEach(k => {
     const acts = k.activations || [];
     if (acts.length === 0) {
-      rowsHtml += `<tr>
-        <td><span class="key-tag">\${k.key}</span> <button class="act-btn btn-copy" onclick="copyText('\${k.key}')">نسخ الكود</button></td>
-        <td><span class="badge badge-unused">جاهز للاستخدام</span></td>
-        <td><span style="color:var(--text-muted);">\${k.note ? '📝 ' + k.note : 'ـ'}</span></td>
-        <td><span style="color:var(--text-muted);">-</span></td>
-        <td>\${new Date(k.created_at).toLocaleDateString('ar-SA')}</td>
-        <td><button class="act-btn btn-del" onclick="deleteKey('\${k.key}')">حذف الكود</button></td>
-      </tr>`;
+      rowsHtml += '<tr>' +
+        '<td><span class="key-tag">' + k.key + '</span> <button class="act-btn btn-copy" onclick="copyText(\\'' + k.key + '\\')">نسخ الكود</button></td>' +
+        '<td><span class="badge badge-unused">جاهز للاستخدام</span></td>' +
+        '<td><span style="color:var(--text-muted);">' + (k.note ? '📝 ' + k.note : 'ـ') + '</span></td>' +
+        '<td><span style="color:var(--text-muted);">-</span></td>' +
+        '<td>' + new Date(k.created_at).toLocaleDateString('ar-SA') + '</td>' +
+        '<td><button class="act-btn btn-del" onclick="deleteKey(\\'' + k.key + '\\')">حذف الكود</button></td>' +
+      '</tr>';
     } else {
       acts.forEach(a => {
         let badgeClass = 'badge-unused', badgeText = 'غير مستخدم';
@@ -613,33 +613,34 @@ function renderTable(keys) {
 
         if (a.status === 'pending') {
           badgeClass = 'badge-pending'; badgeText = 'بانتظار الموافقة';
-          actButtons = `<button class="act-btn btn-approve" onclick="approveKey('\${k.key}', '\${a.device_id}')">موافقة</button>
-                        <button class="act-btn btn-reject" onclick="rejectKey('\${k.key}', '\${a.device_id}')">رفض</button>`;
+          actButtons = '<button class="act-btn btn-approve" onclick="approveKey(\\'' + k.key + '\\', \\'' + a.device_id + '\\')">موافقة</button>' +
+                        '<button class="act-btn btn-reject" onclick="rejectKey(\\'' + k.key + '\\', \\'' + a.device_id + '\\')">رفض</button>';
         } else if (a.status === 'approved') {
           badgeClass = 'badge-approved'; badgeText = 'مفعل وشغال ✅';
-          actButtons = `<button class="act-btn btn-revoke" onclick="lockKey('\${k.key}', '\${a.device_id}')">قفل الأداة</button>
-                        <button class="act-btn btn-reset" onclick="resetKey('\${k.key}')">إلغاء ربط الجهاز</button>`;
+          actButtons = '<button class="act-btn btn-revoke" onclick="lockKey(\\'' + k.key + '\\', \\'' + a.device_id + '\\')">قفل الأداة</button>' +
+                        '<button class="act-btn btn-reset" onclick="resetKey(\\'' + k.key + '\\')">إلغاء ربط الجهاز</button>';
         } else if (a.status === 'rejected' || a.status === 'blocked') {
           badgeClass = 'badge-rejected'; badgeText = 'مقفل / محظور 🚫';
-          actButtons = `<button class="act-btn btn-approve" onclick="unlockKey('\${k.key}', '\${a.device_id}')">إعادة تفعيل</button>
-                        <button class="act-btn btn-reset" onclick="resetKey('\${k.key}')">إلغاء ربط الجهاز</button>`;
+          actButtons = '<button class="act-btn btn-approve" onclick="unlockKey(\\'' + k.key + '\\', \\'' + a.device_id + '\\')">إعادة تفعيل</button>' +
+                        '<button class="act-btn btn-reset" onclick="resetKey(\\'' + k.key + '\\')">إلغاء ربط الجهاز</button>';
         }
 
         const devUUID = a.device_id || '';
-        const uuidDisplay = devUUID ? `
-          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-            <span class="key-tag" style="color:var(--accent); font-size:11.5px; border:1px solid rgba(102,252,241,0.25);">\${devUUID}</span>
-            <button class="act-btn btn-copy" style="color:var(--accent); border-color:rgba(102,252,241,0.4);" onclick="copyText('\${devUUID}')">نسخ UUID</button>
-          </div>` : '<span style="color:var(--text-muted);">-</span>';
+        const uuidDisplay = devUUID ? (
+          '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">' +
+            '<span class="key-tag" style="color:var(--accent); font-size:11.5px; border:1px solid rgba(102,252,241,0.25);">' + devUUID + '</span>' +
+            '<button class="act-btn btn-copy" style="color:var(--accent); border-color:rgba(102,252,241,0.4);" onclick="copyText(\\'' + devUUID + '\\')">نسخ UUID</button>' +
+          '</div>'
+        ) : '<span style="color:var(--text-muted);">-</span>';
 
-        rowsHtml += `<tr>
-          <td><span class="key-tag">\${k.key}</span> <button class="act-btn btn-copy" onclick="copyText('\${k.key}')">نسخ الكود</button></td>
-          <td><span class="badge \${badgeClass}">\${badgeText}</span></td>
-          <td><strong>\${a.device_name || 'iPhone'}</strong><br><span style="font-size:12px; color:var(--text-muted);">\${a.device_model || 'iOS'}\${a.ios_version ? ' • iOS ' + a.ios_version : ''}</span></td>
-          <td>\${uuidDisplay}</td>
-          <td>\${new Date(k.created_at).toLocaleDateString('ar-SA')}\${a.last_seen ? '<br><span style="font-size:11.5px; color:var(--green);">متصل ' + new Date(a.last_seen).toLocaleTimeString('ar-SA') + '</span>' : ''}</td>
-          <td>\${actButtons} <button class="act-btn btn-del" onclick="deleteKey('\${k.key}')">حذف</button></td>
-        </tr>`;
+        rowsHtml += '<tr>' +
+          '<td><span class="key-tag">' + k.key + '</span> <button class="act-btn btn-copy" onclick="copyText(\\'' + k.key + '\\')">نسخ الكود</button></td>' +
+          '<td><span class="badge ' + badgeClass + '">' + badgeText + '</span></td>' +
+          '<td><strong>' + (a.device_name || 'iPhone') + '</strong><br><span style="font-size:12px; color:var(--text-muted);">' + (a.device_model || 'iOS') + (a.ios_version ? ' • iOS ' + a.ios_version : '') + '</span></td>' +
+          '<td>' + uuidDisplay + '</td>' +
+          '<td>' + new Date(k.created_at).toLocaleDateString('ar-SA') + (a.last_seen ? '<br><span style="font-size:11.5px; color:var(--green);">متصل ' + new Date(a.last_seen).toLocaleTimeString('ar-SA') + '</span>' : '') + '</td>' +
+          '<td>' + actButtons + ' <button class="act-btn btn-del" onclick="deleteKey(\\'' + k.key + '\\')">حذف</button></td>' +
+        '</tr>';
       });
     }
   });
@@ -751,27 +752,15 @@ function filterRows() {
 }
 </script>
 </body>
-</html>`;
-  res.send(html);
+</html>`);
 });
 
 // 🕵️ صفحة 404 لجميع الروابط والمسارات غير المعروفة (Stealth Mode)
 app.use((req, res) => {
-  res.status(404).send(`<!DOCTYPE html>
-<html>
-<head>
-  <title>404 Not Found</title>
-</head>
-<body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;">
-  <h1>404 Not Found</h1>
-  <p>The requested URL ${req.originalUrl} was not found on this server.</p>
-  <hr>
-  <address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server at ${req.hostname || 'localhost'} Port 80</address>
-</body>
-</html>`);
+  res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;"><h1>404 Not Found</h1><p>The requested URL ' + req.originalUrl + ' was not found on this server.</p><hr><address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server</address></body></html>');
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running securely on port ${PORT}`);
+  console.log('Server running securely on port ' + PORT);
 });
