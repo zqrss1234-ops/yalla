@@ -2,24 +2,38 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 const app = express();
 app.set('trust proxy', true);
+
+// ==========================================
+// 🛡️ هيدرز منع الكاش نهائياً (Anti-Caching)
+// يمنع أجهزة الآيفون وشبكات النت من تخزين أي رد قديم
+// ==========================================
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  next();
+});
+
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ==========================================
 // 🔑 كلمة المرور للوحة التحكم (حصراً abod2026)
 // ==========================================
-const ADMIN_TOKEN = "abod2026";
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "abod2026";
 
 // المسار السري الخاص بلوحة التحكم
 const ADMIN_PATH = process.env.ADMIN_PATH || "abod-master-7788";
 
 const DB_FILE = path.join(__dirname, 'database.json');
 
-// الجيل الجديد V3: قفل شامل لجميع الأكواد السابقة نهائياً على جميع النسخ
+// الجيل الجديد V3: تصفير وقفل شامل لجميع الأكواد السابقة نهائياً على جميع النسخ
 const CURRENT_EPOCH = "V3_ABOD_PERMANENT_2026";
 
 // الأكواد المدمجة (فارغة لضمان قفل جميع النسخ القديمة فوراً)
@@ -136,36 +150,12 @@ function saveDB(data) {
 initMongoCloud();
 
 // ==========================================
-// 🛡️ حماية لوحة التحكم بكلمة المرور abod2026
+// 🛡️ دالة الاستجابة الشاملة للقفل الفوري
+// تُرجع كائن JSON يضمن قفل أي نسخة من التطبيق مهما كان إصدارها
+// بحالة 200 OK لتفادي مشاكل عدم قراءة الـ Body في iOS
 // ==========================================
-function requireAdminAuth(req, res, next) {
-  const authHeader = req.headers['authorization'] || req.headers['x-admin-token'] || req.query.token;
-  const token = authHeader ? authHeader.replace('Bearer ', '').trim() : '';
-
-  if (token === ADMIN_TOKEN || token === (process.env.ADMIN_TOKEN || "abod2026")) {
-    return next();
-  }
-
-  if (!token) {
-    return res.status(401).json({ success: false, message: "🚫 يرجى إدخال كلمة المرور" });
-  }
-
-  return res.status(403).json({ success: false, message: "⛔ كلمة المرور غير صحيحة" });
-}
-
-// -------------------------------------------------------------
-// 1. معالج فحص وتفعيل الأكواد الشامل (قفل فوري لأي نسخة قديمة)
-// يدعم GET و POST و JSON و Query Params و Form-Data
-// -------------------------------------------------------------
-function handleValidate(req, res) {
-  const key = (req.body && req.body.key) || req.query.key || req.headers['x-license-key'];
-  const deviceId = (req.body && (req.body.deviceId || req.body.device_id)) || req.query.deviceId || req.query.device_id || req.headers['x-device-id'];
-  const deviceName = (req.body && (req.body.deviceName || req.body.device_name)) || req.query.deviceName || 'iPhone';
-  const deviceModel = (req.body && (req.body.deviceModel || req.body.device_model)) || req.query.deviceModel || 'iOS Device';
-  const iosVersion = (req.body && (req.body.iosVersion || req.body.ios_version)) || req.query.iosVersion || '';
-  const bundleId = (req.body && (req.body.bundleId || req.body.bundle_id)) || req.query.bundleId || '';
-
-  const lockedResponse = (msg) => ({
+function buildLockedResponse(msg) {
+  return {
     valid: false,
     approved: false,
     active: false,
@@ -177,25 +167,72 @@ function handleValidate(req, res) {
     code: 403,
     key: null,
     needs_approval: false,
+    needsApproval: false,
     message: msg || "🚫 تم إيقاف وقفل جميع النسخ السابقة نهائياً. تواصل مع عبدالإله لتفعيل نسختك بكود جديد"
-  });
+  };
+}
 
+// ==========================================
+// 🛡️ حماية لوحة التحكم بكلمة المرور abod2026
+// ==========================================
+function requireAdminAuth(req, res, next) {
+  const authHeader = req.headers['authorization'] || req.headers['x-admin-token'] || req.query.token;
+  const token = authHeader ? authHeader.replace('Bearer ', '').trim() : '';
+
+  if (token === ADMIN_TOKEN || token === "abod2026") {
+    return next();
+  }
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: "🚫 يرجى إدخال كلمة المرور" });
+  }
+
+  return res.status(403).json({ success: false, message: "⛔ كلمة المرور غير صحيحة" });
+}
+
+// -------------------------------------------------------------
+// 1. استخراج المعاملات بمرونة تامة لجميع إصدارات التطبيق القديمة والجديدة
+// -------------------------------------------------------------
+function extractRequestParams(req) {
+  const b = req.body || {};
+  const q = req.query || {};
+  const h = req.headers || {};
+
+  const key = b.key || b.Key || b.licenseKey || b.license_key || b.k || q.key || q.Key || h['x-license-key'];
+  const deviceId = b.deviceId || b.device_id || b.DeviceId || b.deviceUUID || b.uuid || q.deviceId || q.device_id || q.uuid || h['x-device-id'];
+  const deviceName = b.deviceName || b.device_name || b.DeviceName || q.deviceName || 'iPhone';
+  const deviceModel = b.deviceModel || b.device_model || b.DeviceModel || q.deviceModel || 'iOS Device';
+  const iosVersion = b.iosVersion || b.ios_version || b.IOSVersion || q.iosVersion || '';
+  const bundleId = b.bundleId || b.bundle_id || b.BundleId || q.bundleId || '';
+
+  return { key, deviceId, deviceName, deviceModel, iosVersion, bundleId };
+}
+
+// -------------------------------------------------------------
+// 2. معالج فحص وتفعيل الأكواد الشامل (قفل فوري لأي نسخة قديمة أو كود محذوف)
+// يدعم GET و POST و JSON و Query Params و Form-Data
+// -------------------------------------------------------------
+function handleValidate(req, res) {
+  const { key, deviceId, deviceName, deviceModel, iosVersion, bundleId } = extractRequestParams(req);
+
+  // إذا كانت البيانات ناقصة -> قفل فوري
   if (!key || !deviceId) {
-    return res.json(lockedResponse("🚫 بيانات التفعيل ناقصة أو غير صالحة"));
+    return res.json(buildLockedResponse("🚫 بيانات التفعيل ناقصة أو غير صالحة"));
   }
 
   const cleanKey = String(key).trim().toUpperCase();
 
-  // قفل فوري لأي كود قديم
+  // قفل فوري لأي كود قديم أو غير تابع للجيل الجديد V3
   if (cleanKey.startsWith('YS-') || cleanKey.startsWith('YS') || !cleanKey.startsWith('ABOD-V3-')) {
-    return res.json(lockedResponse());
+    return res.json(buildLockedResponse());
   }
 
   const db = loadDB();
   const keyObj = (db.keys || []).find(k => k.key && k.key.trim().toUpperCase() === cleanKey);
 
+  // إذا كان الكود محذوفاً من السيرفر أو غير موجود -> قفل فوري
   if (!keyObj) {
-    return res.json(lockedResponse("🚫 كود التفعيل غير صالح أو ملغي"));
+    return res.json(buildLockedResponse("🚫 كود التفعيل غير صالح أو تم حذفه من قِبل الإدارة"));
   }
 
   if (!keyObj.activations) {
@@ -206,7 +243,7 @@ function handleValidate(req, res) {
 
   if (thisDevice) {
     if (thisDevice.status === 'rejected' || thisDevice.status === 'blocked') {
-      return res.json(lockedResponse("🚫 تم إيقاف وقفل الأداة عن هذا الجهاز من قِبل الإدارة"));
+      return res.json(buildLockedResponse("🚫 تم إيقاف وقفل الأداة عن هذا الجهاز من قِبل الإدارة"));
     }
     
     if (thisDevice.status === 'approved') {
@@ -234,14 +271,16 @@ function handleValidate(req, res) {
       active: false,
       success: false,
       needs_approval: true, 
+      needsApproval: true,
       status: "pending",
       message: "⏳ بانتظار الموافقة على جهازك من لوحة التحكم" 
     });
   }
 
+  // منع استخدام الكود على أكثر من جهاز
   const approvedOnOtherDevice = keyObj.activations.find(a => a.status === 'approved' && a.device_id !== deviceId);
   if (approvedOnOtherDevice) {
-    return res.json(lockedResponse("⚠️ هذا الكود مفعّل لجهاز آخر بالفعل ولا يمكن استخدامه على هذا الجهاز!"));
+    return res.json(buildLockedResponse("⚠️ هذا الكود مفعّل لجهاز آخر بالفعل ولا يمكن استخدامه على هذا الجهاز!"));
   }
 
   const newActivation = {
@@ -273,28 +312,14 @@ function handleValidate(req, res) {
 }
 
 // -------------------------------------------------------------
-// 1.1 معالج فحص النسخ الـ 16 الشامل (Check Device Handler)
+// 3. معالج فحص النسخ الـ 16 الشامل (Check Device Handler)
+// يدعم GET و POST و JSON و Query Params
 // -------------------------------------------------------------
 function handleCheckDevice(req, res) {
-  const deviceId = (req.body && (req.body.deviceId || req.body.device_id)) || req.query.deviceId || req.query.device_id || req.headers['x-device-id'];
-  const deviceName = (req.body && (req.body.deviceName || req.body.device_name)) || req.query.deviceName || 'iPhone';
-  const deviceModel = (req.body && (req.body.deviceModel || req.body.device_model)) || req.query.deviceModel || 'iOS Device';
-  const iosVersion = (req.body && (req.body.iosVersion || req.body.ios_version)) || req.query.iosVersion || '';
-
-  const lockedDeviceResponse = (msg) => ({
-    valid: false,
-    approved: false,
-    active: false,
-    success: false,
-    allowed: false,
-    licensed: false,
-    status: "blocked",
-    key: null,
-    message: msg || "🚫 الأداة مقفلة! انتهت صلاحية الأكواد السابقة، يرجى التفعيل بكود جديد من النسخة الأساسية"
-  });
+  const { deviceId, deviceName, deviceModel, iosVersion } = extractRequestParams(req);
 
   if (!deviceId) {
-    return res.json(lockedDeviceResponse("معرف الجهاز مفقود"));
+    return res.json(buildLockedResponse("معرف الجهاز مفقود"));
   }
 
   const db = loadDB();
@@ -302,7 +327,7 @@ function handleCheckDevice(req, res) {
     const act = (k.activations || []).find(a => a.device_id === deviceId);
     if (act) {
       if (act.status === 'blocked' || act.status === 'rejected') {
-        return res.json(lockedDeviceResponse("🚫 تم قفل الأداة عن هذا الجهاز"));
+        return res.json(buildLockedResponse("🚫 تم قفل الأداة عن هذا الجهاز"));
       }
       if (act.status === 'approved') {
         act.last_seen = new Date().toISOString();
@@ -323,19 +348,31 @@ function handleCheckDevice(req, res) {
         });
       }
       if (act.status === 'pending') {
-        return res.json({ valid: false, approved: false, needs_approval: true, status: "pending", message: "⏳ بانتظار الموافقة" });
+        return res.json({ 
+          valid: false, 
+          approved: false, 
+          needs_approval: true, 
+          needsApproval: true, 
+          status: "pending", 
+          message: "⏳ بانتظار الموافقة" 
+        });
       }
     }
   }
 
-  return res.json(lockedDeviceResponse());
+  // إذا لم يكن الجهاز مسجلاً في أي كود حالي مفعّل -> قفل فوري
+  return res.json(buildLockedResponse("🚫 النسخة مقفلة! انتهت صلاحية الأكواد السابقة، يرجى التفعيل بكود جديد"));
 }
 
-// تسجيل مسارات الفحص بكافة التسميات (GET و POST)
+// -------------------------------------------------------------
+// 4. تسجيل مسارات الفحص بكافة التسميات الممكنة عبر كل الإصدارات
+// -------------------------------------------------------------
 const validateRoutes = [
   '/api/validate', '/validate', '/api/v1/validate',
   '/api/license', '/license', '/api/v1/license',
-  '/api/verify', '/verify', '/api/v1/verify'
+  '/api/verify', '/verify', '/api/v1/verify',
+  '/api/activate', '/activate', '/api/v1/activate',
+  '/api/auth', '/auth', '/api/v1/auth'
 ];
 const checkDeviceRoutes = [
   '/api/check_device', '/check_device', '/api/v1/check_device',
@@ -357,7 +394,14 @@ checkDeviceRoutes.forEach(r => {
 });
 
 // -------------------------------------------------------------
-// 2. Admin APIs: جلب وإدارة وتوليد الأكواد
+// 5. مسار فحص حالة السيرفر (Health Check & Keep-Alive)
+// -------------------------------------------------------------
+app.get('/api/health', (req, res) => {
+  res.json({ status: "alive", time: Date.now(), cloud: isMongoActive });
+});
+
+// -------------------------------------------------------------
+// 6. Admin APIs: جلب وإدارة وتوليد الأكواد
 // -------------------------------------------------------------
 app.get('/api/admin/keys', requireAdminAuth, (req, res) => {
   const db = loadDB();
@@ -546,17 +590,16 @@ app.post('/api/admin/restore', requireAdminAuth, (req, res) => {
 
 // -------------------------------------------------------------
 // 🛡️ معالج حماية شامل لأي مسار API غير معروف (قفل فوري بدون 404 HTML)
+// إذا اتصلت أي نسخة قديمة بأي مسار تحت /api/، يُرجع السيرفر JSON
+// بحالة 200 OK و valid: false لتقفل النسخة فوراً بدلاً من تجاهل خطأ HTML
 // -------------------------------------------------------------
 app.all('/api/*', (req, res) => {
-  res.json({
-    valid: false,
-    approved: false,
-    active: false,
-    success: false,
-    allowed: false,
-    status: "blocked",
-    message: "🚫 تم إيقاف وقفل الأداة من الإدارة"
-  });
+  res.json(buildLockedResponse("🚫 تم إيقاف وقفل الأداة من الإدارة"));
+});
+
+// وأي طلب POST أو PUT موجه لأي مسار في السيرفر لا يخص لوحة التحكم: قفل فوري أيضاً
+app.post('*', (req, res) => {
+  res.json(buildLockedResponse());
 });
 
 // صفحة 404 للمسار الرئيسي (Stealth Mode)
@@ -1015,8 +1058,8 @@ function filterRows() {
   var filtered = allKeys.filter(function(k) {
     if (k.key.toLowerCase().indexOf(q) !== -1) return true;
     return (k.activations || []).some(function(a) {
-      return (a.device_name && a.device_name.toLowerCase().indexOf(q)) ||
-             (a.device_id && a.device_id.toLowerCase().indexOf(q));
+      return (a.device_name && a.device_name.toLowerCase().indexOf(q) !== -1) ||
+             (a.device_id && a.device_id.toLowerCase().indexOf(q) !== -1);
     });
   });
   renderTable(filtered);
@@ -1030,6 +1073,22 @@ function filterRows() {
 app.use((req, res) => {
   res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;"><h1>404 Not Found</h1><p>The requested URL ' + req.originalUrl + ' was not found on this server.</p><hr><address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server</address></body></html>');
 });
+
+// ==========================================
+// 🚀 نظام الحفاظ على يقظة السيرفر (Self Keep-Alive)
+// يمنع خادم Render المجاني من الدخول في وضع النوم (Spin-Down)
+// حتى يرد السيرفر في أقل من 100 ملي ثانية دائماً ولا يحدث Timeout على أجهزة المستخدمين
+// ==========================================
+const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || 'https://yalla-upd0.onrender.com/api/health';
+setInterval(() => {
+  try {
+    https.get(KEEP_ALIVE_URL, (res) => {
+      // Keep-alive successful
+    }).on('error', () => {
+      // Ignore network hiccup
+    });
+  } catch (e) {}
+}, 7 * 60 * 1000); // كل 7 دقائق (قبل مهلة النوم 15 دقيقة)
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
