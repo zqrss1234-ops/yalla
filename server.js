@@ -4,28 +4,28 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-app.set('trust proxy', true); // قراءة الآي بي الحقيقي خلف Render و Cloudflare
+app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 
 // ==========================================
-// 🔑 كلمة السر للوحة التحكم (حصراً abod2026)
+// 🔑 كلمة المرور للوحة التحكم (حصراً abod2026)
 // ==========================================
 const ADMIN_TOKEN = "abod2026";
 
-// 🕵️ المسار السري الخاص بلوحة التحكم
+// المسار السري الخاص بلوحة التحكم
 const ADMIN_PATH = process.env.ADMIN_PATH || "abod-master-7788";
 
 const DB_FILE = path.join(__dirname, 'database.json');
 
-// 🚨 الجيل الجديد V3: تصفير شامل لجميع الأكواد السابقة نهائياً وقفل كل النسخ على الجميع
+// الجيل الجديد V3: قفل شامل لجميع الأكواد السابقة نهائياً على جميع النسخ
 const CURRENT_EPOCH = "V3_ABOD_PERMANENT_2026";
 
-// 👑 الأكواد المدمجة (فارغة لضمان قفل جميع النسخ القديمة فوراً)
+// الأكواد المدمجة (فارغة لضمان قفل جميع النسخ القديمة فوراً)
 const INITIAL_KEYS = [];
 
 // ==========================================
-// 🛡️ طبقة التخزين السحابي الدائم (MongoDB Atlas Support)
+// 🛡️ التخزين السحابي الدائم (MongoDB Atlas)
 // ==========================================
 let memoryDB = { epoch: CURRENT_EPOCH, keys: INITIAL_KEYS, adminToken: ADMIN_TOKEN };
 let isMongoActive = false;
@@ -42,9 +42,8 @@ function loadLocalFileDB() {
     if (!parsed.keys) {
       parsed.keys = [];
     }
-    // إذا كانت قاعدة البيانات من الجيل القديم، يتم تصفيرها فوراً
     if (parsed.epoch !== CURRENT_EPOCH) {
-      console.log("🚨 [V3 RESET] تم تصفير وقفل جميع النسخ والأكواد السابقة نهائياً على الجميع!");
+      console.log("🚨 [V3 RESET] تصفير وقفل جميع النسخ والأكواد السابقة نهائياً على الجميع!");
       parsed.keys = [];
       parsed.epoch = CURRENT_EPOCH;
       saveLocalDB(parsed);
@@ -92,7 +91,7 @@ async function initMongoCloud() {
     const remoteDoc = await mongoCollection.findOne({ _id: 'master_license_store' });
     if (remoteDoc) {
       if (remoteDoc.epoch !== CURRENT_EPOCH) {
-        console.log("🚨 [MONGO V3 RESET] تصفير قاعدة بيانات MongoDB السحابية وقفل كل النسخ والأجهزة السابقة نهائياً!");
+        console.log("🚨 [MONGO V3 RESET] تصفير قاعدة بيانات MongoDB وقفل كل النسخ القديمة نهائياً!");
         await mongoCollection.updateOne(
           { _id: 'master_license_store' },
           { $set: { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, updatedAt: new Date().toISOString() } },
@@ -136,7 +135,7 @@ function saveDB(data) {
 initMongoCloud();
 
 // ==========================================
-// 🛡️ حماية لوحة التحكم بكلمة السر abod2026 (بدون أي حظر أو تعليق)
+// 🛡️ حماية لوحة التحكم بكلمة المرور abod2026
 // ==========================================
 function requireAdminAuth(req, res, next) {
   const authHeader = req.headers['authorization'] || req.headers['x-admin-token'] || req.query.token;
@@ -147,14 +146,14 @@ function requireAdminAuth(req, res, next) {
   }
 
   if (!token) {
-    return res.status(401).json({ success: false, message: "🚫 غير مصرح: يرجى كتابة رمز الأدمن" });
+    return res.status(401).json({ success: false, message: "🚫 يرجى إدخال كلمة المرور" });
   }
 
-  return res.status(403).json({ success: false, message: "⛔ كلمة السر غير صحيحة (المطلوبة: abod2026)" });
+  return res.status(403).json({ success: false, message: "⛔ كلمة المرور غير صحيحة" });
 }
 
 // -------------------------------------------------------------
-// 1. معالج فحص وتفعيل الأكواد (قفل فوري لأي نسخة قديمة)
+// 1. معالج فحص وتفعيل الأكواد (قفل فوري لأي نسخة سابقة)
 // -------------------------------------------------------------
 function handleValidate(req, res) {
   const key = req.body.key;
@@ -170,19 +169,19 @@ function handleValidate(req, res) {
 
   const cleanKey = key.trim().toUpperCase();
 
-  // 🚫 قفل فوري لأي كود قديم يبدأ بـ YS-
+  // قفل فوري لأي كود قديم يبدأ بـ YS-
   if (cleanKey.startsWith('YS-')) {
     return res.json({ 
       valid: false, 
       needs_approval: false, 
-      message: "🚫 تم إيقاف وقفل جميع النسخ والأكواد السابقة نهائياً. يرجى الحصول على كود جديد من عبدالإله" 
+      message: "🚫 تم إيقاف وقفل جميع النسخ السابقة نهائياً. تواصل مع عبدالإله للحصول على كود جديد" 
     });
   }
 
   const db = loadDB();
   const keyObj = (db.keys || []).find(k => k.key && k.key.trim().toUpperCase() === cleanKey);
 
-  // إذا لم يكن الكود موجوداً في الأكواد المولدة الجديدة، يتم قفل النسخة فوراً
+  // إذا لم يكن الكود موجوداً في الأكواد الجديدة المولدة، يتم قفل النسخة فوراً
   if (!keyObj) {
     return res.json({ 
       valid: false, 
@@ -201,7 +200,7 @@ function handleValidate(req, res) {
     if (thisDevice.status === 'rejected' || thisDevice.status === 'blocked') {
       return res.json({ 
         valid: false, 
-        message: "🚫 تم إيقاف وقفل الأداة عن هذا الجهاز من الإدارة" 
+        message: "🚫 تم إيقاف وقفل الأداة عن هذا الجهاز من قِبل الإدارة" 
       });
     }
     
@@ -224,7 +223,7 @@ function handleValidate(req, res) {
     });
   }
 
-  // منع استخدام الكود الواحد على أكثر من جهاز
+  // منع استخدام الكود على أكثر من جهاز
   const approvedOnOtherDevice = keyObj.activations.find(a => a.status === 'approved' && a.device_id !== deviceId);
   if (approvedOnOtherDevice) {
     return res.json({ 
@@ -294,7 +293,6 @@ function handleCheckDevice(req, res) {
     }
   }
 
-  // قفل فوري لجميع النسخ غير المفعلة بكود جديد
   return res.json({ 
     valid: false, 
     approved: false, 
@@ -303,7 +301,7 @@ function handleCheckDevice(req, res) {
   });
 }
 
-// تسجيل مسارات الفحص بكافة التنسيقات لضمان إغلاق وقفل كل النسخ الـ 16
+// تسجيل مسارات الفحص بكافة التسميات لضمان قفل كل النسخ الـ 16
 app.post('/api/validate', handleValidate);
 app.post('/api/verify', handleValidate);
 app.post('/api/license', handleValidate);
@@ -317,7 +315,7 @@ app.get('/api/check_device', handleCheckDevice);
 app.get('/api/check-device', handleCheckDevice);
 
 // -------------------------------------------------------------
-// 2. لوحة التحكم: جلب وإدارة وتوليد الأكواد
+// 2. Admin APIs: جلب وإدارة وتوليد الأكواد
 // -------------------------------------------------------------
 app.get('/api/admin/keys', requireAdminAuth, (req, res) => {
   const db = loadDB();
@@ -373,6 +371,37 @@ app.post('/api/admin/generate', requireAdminAuth, (req, res) => {
   res.json({ success: true, keys: generated });
 });
 
+app.post('/api/admin/approve', requireAdminAuth, (req, res) => {
+  const { key, deviceId } = req.body;
+  const targetDeviceId = deviceId || req.body.device_id;
+  const db = loadDB();
+  const keyObj = (db.keys || []).find(k => k.key === key);
+  if (keyObj && keyObj.activations) {
+    const act = keyObj.activations.find(a => a.device_id === targetDeviceId);
+    if (act) {
+      act.status = 'approved';
+      act.approved_at = new Date().toISOString();
+    }
+    saveDB(db);
+  }
+  res.json({ success: true, message: "تمت الموافقة وتفعيل الجهاز" });
+});
+
+app.post('/api/admin/reject', requireAdminAuth, (req, res) => {
+  const { key, deviceId } = req.body;
+  const targetDeviceId = deviceId || req.body.device_id;
+  const db = loadDB();
+  const keyObj = (db.keys || []).find(k => k.key === key);
+  if (keyObj && keyObj.activations) {
+    const act = keyObj.activations.find(a => a.device_id === targetDeviceId);
+    if (act) {
+      act.status = 'rejected';
+    }
+    saveDB(db);
+  }
+  res.json({ success: true, message: "تم رفض الجهاز" });
+});
+
 app.post('/api/admin/lock', requireAdminAuth, (req, res) => {
   const { key, deviceId } = req.body;
   const targetDeviceId = deviceId || req.body.device_id;
@@ -423,7 +452,7 @@ app.post('/api/admin/reset', requireAdminAuth, (req, res) => {
   res.json({ success: true, message: "تم مسح ارتباط الجهاز وإتاحة الكود مجدداً" });
 });
 
-// 🚨 API: قفل وتصفير شامل لجميع الأكواد والأجهزة فورياً
+// قفل وتصفير شامل لجميع الأكواد والأجهزة فورياً
 app.post('/api/admin/purge_all', requireAdminAuth, async (req, res) => {
   const db = loadDB();
   db.keys = [];
@@ -440,10 +469,10 @@ app.post('/api/admin/purge_all', requireAdminAuth, async (req, res) => {
       console.error("[MONGO PURGE ERROR]", e);
     }
   }
-  res.json({ success: true, message: "🚨 تم قفل وتصفير جميع الأكواد بنجاح! جميع النسخ أصبحت مقفلة الآن." });
+  res.json({ success: true, message: "🚨 تم قفل وتصفير جميع الأكواد بنجاح! جميع النسخ مقفلة الآن." });
 });
 
-// 📥 تصدير نسخة احتياطية
+// تصدير نسخة احتياطية
 app.get('/api/admin/backup', requireAdminAuth, (req, res) => {
   const db = loadDB();
   res.setHeader('Content-Type', 'application/json');
@@ -451,7 +480,7 @@ app.get('/api/admin/backup', requireAdminAuth, (req, res) => {
   res.send(JSON.stringify(db, null, 2));
 });
 
-// 📤 استيراد نسخة احتياطية
+// استيراد نسخة احتياطية
 app.post('/api/admin/restore', requireAdminAuth, (req, res) => {
   const incomingData = req.body;
   if (!incomingData || !Array.isArray(incomingData.keys)) {
@@ -473,15 +502,16 @@ app.post('/api/admin/restore', requireAdminAuth, (req, res) => {
   res.json({ success: true, message: 'تم استعادة ودمج ' + added + ' كود بنجاح!' });
 });
 
-// 🕵️ صفحة 404 للمسار الرئيسي (Stealth Mode)
+// صفحة 404 للمسار الرئيسي (Stealth Mode)
 app.get('/', (req, res) => {
   res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;"><h1>404 Not Found</h1><p>The requested URL / was not found on this server.</p><hr><address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server</address></body></html>');
 });
 
 // -------------------------------------------------------------
-// 👑 صفحة لوحة التحكم (المسار: /abod-master-7788)
+// 👑 صفحة لوحة التحكم المشفرة والآمنة 100%
 // -------------------------------------------------------------
 app.get('/' + ADMIN_PATH, (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -562,9 +592,9 @@ app.get('/' + ADMIN_PATH, (req, res) => {
 
   .key-tag { font-family: monospace; background: #000; padding: 5px 10px; border-radius: 6px; color: var(--gold-light); font-weight: 700; }
 
-  /* نافذة تسجيل الدخول */
+  /* نافذة الدخول المشفرة (لا ثغرات، لا كلمة مرور مكشوفة) */
   #loginModal { position: fixed; inset: 0; background: rgba(0,0,0,0.96); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-  #loginBox { background: var(--card-bg); padding: 40px; border-radius: 24px; border: 1px solid var(--gold); width: 400px; text-align: center; box-shadow: 0 10px 40px rgba(212, 175, 55, 0.25); }
+  #loginBox { background: var(--card-bg); padding: 40px; border-radius: 24px; border: 1px solid var(--gold); width: 380px; text-align: center; box-shadow: 0 10px 40px rgba(212, 175, 55, 0.25); }
 </style>
 </head>
 <body>
@@ -572,9 +602,9 @@ app.get('/' + ADMIN_PATH, (req, res) => {
 <div id="loginModal">
   <div id="loginBox">
     <h2 style="color:var(--gold); margin-bottom:10px; font-size:24px;">👑 لوحة تحكم عبدالإله</h2>
-    <p style="color:var(--text-muted); font-size:14px; margin-bottom:20px;">كلمة السر للدخول: <b style="color:var(--gold-light);">abod2026</b></p>
-    <input type="text" id="adminTokenInput" class="input" value="abod2026" placeholder="abod2026" style="width:100%; margin-bottom:18px; text-align:center; font-size:17px; font-weight:bold; letter-spacing:1px;" onkeydown="if(event.key==='Enter') login()">
-    <button class="btn btn-gold" onclick="login()" style="width:100%; justify-content:center; font-size:16px;">دخول فوري 🔓</button>
+    <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:22px;">تسجيل الدخول المشفر للأدمن</p>
+    <input type="password" id="adminTokenInput" class="input" placeholder="كلمة المرور..." style="width:100%; margin-bottom:18px; text-align:center; font-size:18px;" onkeydown="if(event.key==='Enter') login()">
+    <button class="btn btn-gold" onclick="login()" style="width:100%; justify-content:center; font-size:16px;">دخول 🔓</button>
   </div>
 </div>
 
@@ -653,8 +683,8 @@ app.get('/' + ADMIN_PATH, (req, res) => {
 </div>
 
 <script>
-let authToken = localStorage.getItem('ys_admin_token') || 'abod2026';
-let allKeys = [];
+var authToken = localStorage.getItem('ys_admin_token') || '';
+var allKeys = [];
 
 localStorage.removeItem('ys_persistent_vault');
 localStorage.removeItem('ys_persistent_vault_v2');
@@ -664,9 +694,13 @@ if (authToken) {
 }
 
 function login() {
-  const token = document.getElementById('adminTokenInput').value.trim();
-  if (!token) return alert('الرجاء كتابة كلمة السر');
-  testAuth(token);
+  var input = document.getElementById('adminTokenInput');
+  var token = input ? input.value.trim() : '';
+  if (!token) {
+    alert('الرجاء كتابة كلمة المرور');
+    return;
+  }
+  testAuth(token, false);
 }
 
 function logout() {
@@ -675,194 +709,214 @@ function logout() {
   location.reload();
 }
 
-async function testAuth(token, isAutoCheck = false) {
-  try {
-    const res = await fetch('/api/admin/keys', { headers: { 'Authorization': 'Bearer ' + token } });
-    if (res.ok) {
-      authToken = token;
-      localStorage.setItem('ys_admin_token', token);
-      document.getElementById('loginModal').style.display = 'none';
-      document.getElementById('mainDashboard').style.display = 'block';
-      loadData();
-    } else {
-      if (!isAutoCheck) {
-        alert('⛔ كلمة السر غير صحيحة! كلمة السر هي: abod2026');
+function testAuth(token, isAutoCheck) {
+  fetch('/api/admin/keys', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(function(res) {
+      if (res.ok) {
+        authToken = token;
+        localStorage.setItem('ys_admin_token', token);
+        document.getElementById('loginModal').style.display = 'none';
+        document.getElementById('mainDashboard').style.display = 'block';
+        loadData();
+      } else {
+        if (!isAutoCheck) {
+          alert('⛔ كلمة المرور غير صحيحة');
+        }
       }
-    }
-  } catch (e) {
-    if (!isAutoCheck) {
-      alert('حدث خطأ أثناء الاتصال بالسيرفر');
-    }
-  }
+    })
+    .catch(function() {
+      if (!isAutoCheck) {
+        alert('حدث خطأ أثناء الاتصال بالسيرفر');
+      }
+    });
 }
 
-async function loadData() {
-  try {
-    const res = await fetch('/api/admin/keys', { headers: { 'Authorization': 'Bearer ' + authToken } });
-    if (!res.ok) { logout(); return; }
-    const data = await res.json();
-    allKeys = data.keys || [];
+function loadData() {
+  fetch('/api/admin/keys', { headers: { 'Authorization': 'Bearer ' + authToken } })
+    .then(function(res) {
+      if (!res.ok) { logout(); return; }
+      return res.json();
+    })
+    .then(function(data) {
+      if (!data) return;
+      allKeys = data.keys || [];
 
-    document.getElementById('statPending').textContent = data.stats.pending || 0;
-    document.getElementById('statApproved').textContent = data.stats.approved || 0;
-    document.getElementById('statTotal').textContent = allKeys.length;
-    document.getElementById('statRejected').textContent = data.stats.rejected || 0;
+      document.getElementById('statPending').textContent = (data.stats && data.stats.pending) || 0;
+      document.getElementById('statApproved').textContent = (data.stats && data.stats.approved) || 0;
+      document.getElementById('statTotal').textContent = allKeys.length;
+      document.getElementById('statRejected').textContent = (data.stats && data.stats.rejected) || 0;
 
-    const cloudTag = document.getElementById('cloudStatusTag');
-    if (data.cloud_active) {
-      cloudTag.textContent = '🟢 قاعدة البيانات السحابية (MongoDB) متصلة ودائمة 100%';
-      cloudTag.style.background = 'rgba(46, 204, 113, 0.15)';
-      cloudTag.style.color = 'var(--green)';
-      cloudTag.style.borderColor = 'rgba(46, 204, 113, 0.3)';
-    } else {
-      cloudTag.textContent = '🟢 التخزين المحلي نشط ومحمي 100%';
-      cloudTag.style.background = 'rgba(102, 252, 241, 0.15)';
-      cloudTag.style.color = 'var(--accent)';
-      cloudTag.style.borderColor = 'rgba(102, 252, 241, 0.3)';
-    }
+      var cloudTag = document.getElementById('cloudStatusTag');
+      if (data.cloud_active) {
+        cloudTag.textContent = '🟢 قاعدة البيانات السحابية (MongoDB) متصلة ودائمة 100%';
+        cloudTag.style.background = 'rgba(46, 204, 113, 0.15)';
+        cloudTag.style.color = 'var(--green)';
+        cloudTag.style.borderColor = 'rgba(46, 204, 113, 0.3)';
+      } else {
+        cloudTag.textContent = '🟢 التخزين المحلي نشط ومحمي 100%';
+        cloudTag.style.background = 'rgba(102, 252, 241, 0.15)';
+        cloudTag.style.color = 'var(--accent)';
+        cloudTag.style.borderColor = 'rgba(102, 252, 241, 0.3)';
+      }
 
-    renderTable(allKeys);
-  } catch (err) { console.error(err); }
+      renderTable(allKeys);
+    })
+    .catch(function(err) { console.error(err); });
 }
 
 function renderTable(keys) {
-  const tbody = document.getElementById('tableBody');
+  var tbody = document.getElementById('tableBody');
   if (!keys || keys.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 35px;">لا توجد أكواد حالياً، اضغط "توليد أكواد جديدة للعملاء" في الأعلى</td></tr>';
     return;
   }
 
-  let rowsHtml = '';
-  keys.forEach(k => {
-    const acts = k.activations || [];
+  var rowsHtml = '';
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var acts = k.activations || [];
     if (acts.length === 0) {
       rowsHtml += '<tr>' +
-        '<td><span class="key-tag">' + k.key + '</span> <button class="act-btn btn-copy" onclick="copyText(\\'' + k.key + '\\')">نسخ الكود</button></td>' +
+        '<td><span class="key-tag">' + k.key + '</span> <button class="act-btn btn-copy" data-key="' + k.key + '" onclick="copyText(this.dataset.key)">نسخ الكود</button></td>' +
         '<td><span class="badge badge-unused">جاهز للاستخدام</span></td>' +
         '<td><span style="color:var(--text-muted);">' + (k.note ? '📝 ' + k.note : 'ـ') + '</span></td>' +
         '<td><span style="color:var(--text-muted);">-</span></td>' +
         '<td>' + new Date(k.created_at).toLocaleDateString('ar-SA') + '</td>' +
-        '<td><button class="act-btn btn-del" onclick="deleteKey(\\'' + k.key + '\\')">حذف الكود</button></td>' +
+        '<td><button class="act-btn btn-del" data-key="' + k.key + '" onclick="deleteKey(this.dataset.key)">حذف الكود</button></td>' +
       '</tr>';
     } else {
-      acts.forEach(a => {
-        let badgeClass = 'badge-unused', badgeText = 'غير مستخدم';
-        let actButtons = '';
+      for (var j = 0; j < acts.length; j++) {
+        var a = acts[j];
+        var badgeClass = 'badge-unused', badgeText = 'غير مستخدم';
+        var actButtons = '';
 
         if (a.status === 'pending') {
           badgeClass = 'badge-pending'; badgeText = 'بانتظار الموافقة';
-          actButtons = '<button class="act-btn btn-approve" onclick="approveKey(\\'' + k.key + '\\', \\'' + a.device_id + '\\')">موافقة</button>' +
-                        '<button class="act-btn btn-reject" onclick="rejectKey(\\'' + k.key + '\\', \\'' + a.device_id + '\\')">رفض</button>';
+          actButtons = '<button class="act-btn btn-approve" data-key="' + k.key + '" data-dev="' + a.device_id + '" onclick="approveKey(this.dataset.key, this.dataset.dev)">موافقة</button>' +
+                        '<button class="act-btn btn-reject" data-key="' + k.key + '" data-dev="' + a.device_id + '" onclick="rejectKey(this.dataset.key, this.dataset.dev)">رفض</button>';
         } else if (a.status === 'approved') {
           badgeClass = 'badge-approved'; badgeText = 'مفعل وشغال ✅';
-          actButtons = '<button class="act-btn btn-revoke" onclick="lockKey(\\'' + k.key + '\\', \\'' + a.device_id + '\\')">قفل الأداة</button>' +
-                        '<button class="act-btn btn-reset" onclick="resetKey(\\'' + k.key + '\\')">إلغاء ربط الجهاز</button>';
+          actButtons = '<button class="act-btn btn-revoke" data-key="' + k.key + '" data-dev="' + a.device_id + '" onclick="lockKey(this.dataset.key, this.dataset.dev)">قفل الأداة</button>' +
+                        '<button class="act-btn btn-reset" data-key="' + k.key + '" onclick="resetKey(this.dataset.key)">إلغاء ربط الجهاز</button>';
         } else if (a.status === 'rejected' || a.status === 'blocked') {
           badgeClass = 'badge-rejected'; badgeText = 'مقفل / محظور 🚫';
-          actButtons = '<button class="act-btn btn-approve" onclick="unlockKey(\\'' + k.key + '\\', \\'' + a.device_id + '\\')">إعادة تفعيل</button>' +
-                        '<button class="act-btn btn-reset" onclick="resetKey(\\'' + k.key + '\\')">إلغاء ربط الجهاز</button>';
+          actButtons = '<button class="act-btn btn-approve" data-key="' + k.key + '" data-dev="' + a.device_id + '" onclick="unlockKey(this.dataset.key, this.dataset.dev)">إعادة تفعيل</button>' +
+                        '<button class="act-btn btn-reset" data-key="' + k.key + '" onclick="resetKey(this.dataset.key)">إلغاء ربط الجهاز</button>';
         }
 
-        const devUUID = a.device_id || '';
-        const uuidDisplay = devUUID ? (
+        var devUUID = a.device_id || '';
+        var uuidDisplay = devUUID ? (
           '<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">' +
             '<span class="key-tag" style="color:var(--accent); font-size:11.5px; border:1px solid rgba(102,252,241,0.25);">' + devUUID + '</span>' +
-            '<button class="act-btn btn-copy" style="color:var(--accent); border-color:rgba(102,252,241,0.4);" onclick="copyText(\\'' + devUUID + '\\')">نسخ UUID</button>' +
+            '<button class="act-btn btn-copy" data-txt="' + devUUID + '" onclick="copyText(this.dataset.txt)">نسخ UUID</button>' +
           '</div>'
         ) : '<span style="color:var(--text-muted);">-</span>';
 
         rowsHtml += '<tr>' +
-          '<td><span class="key-tag">' + k.key + '</span> <button class="act-btn btn-copy" onclick="copyText(\\'' + k.key + '\\')">نسخ الكود</button></td>' +
+          '<td><span class="key-tag">' + k.key + '</span> <button class="act-btn btn-copy" data-key="' + k.key + '" onclick="copyText(this.dataset.key)">نسخ الكود</button></td>' +
           '<td><span class="badge ' + badgeClass + '">' + badgeText + '</span></td>' +
           '<td><strong>' + (a.device_name || 'iPhone') + '</strong><br><span style="font-size:12px; color:var(--text-muted);">' + (a.device_model || 'iOS') + (a.ios_version ? ' • iOS ' + a.ios_version : '') + '</span></td>' +
           '<td>' + uuidDisplay + '</td>' +
           '<td>' + new Date(k.created_at).toLocaleDateString('ar-SA') + (a.last_seen ? '<br><span style="font-size:11.5px; color:var(--green);">متصل ' + new Date(a.last_seen).toLocaleTimeString('ar-SA') + '</span>' : '') + '</td>' +
-          '<td>' + actButtons + ' <button class="act-btn btn-del" onclick="deleteKey(\\'' + k.key + '\\')">حذف</button></td>' +
+          '<td>' + actButtons + ' <button class="act-btn btn-del" data-key="' + k.key + '" onclick="deleteKey(this.dataset.key)">حذف</button></td>' +
         '</tr>';
-      });
+      }
     }
-  });
+  }
 
   tbody.innerHTML = rowsHtml;
 }
 
 function toggleGen() {
-  const box = document.getElementById('genBox');
+  var box = document.getElementById('genBox');
   box.classList.toggle('show');
 }
 
-async function generateKeys() {
-  const count = document.getElementById('genCount').value;
-  const note = document.getElementById('genNote').value;
-  const res = await fetch('/api/admin/generate', {
+function generateKeys() {
+  var count = document.getElementById('genCount').value;
+  var note = document.getElementById('genNote').value;
+  fetch('/api/admin/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
     body: JSON.stringify({ count: parseInt(count), note: note })
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    var resBox = document.getElementById('genResults');
+    resBox.style.display = 'block';
+    resBox.innerHTML = '<strong>👑 تم توليد الأكواد بنجاح:</strong><br>' + data.keys.join('<br>');
+    loadData();
   });
-  const data = await res.json();
-  const resBox = document.getElementById('genResults');
-  resBox.style.display = 'block';
-  resBox.innerHTML = '<strong>👑 تم توليد الأكواد بنجاح (جاهزة للنسخ والتوزيع):</strong><br>' + data.keys.join('<br>');
-  loadData();
 }
 
-async function lockKey(key, deviceId) {
-  await fetch('/api/admin/lock', {
+function approveKey(key, deviceId) {
+  fetch('/api/admin/approve', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-    body: JSON.stringify({ key, deviceId })
-  });
-  loadData();
+    body: JSON.stringify({ key: key, deviceId: deviceId })
+  }).then(function() { loadData(); });
 }
 
-async function unlockKey(key, deviceId) {
-  await fetch('/api/admin/unlock', {
+function rejectKey(key, deviceId) {
+  fetch('/api/admin/reject', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-    body: JSON.stringify({ key, deviceId })
-  });
-  loadData();
+    body: JSON.stringify({ key: key, deviceId: deviceId })
+  }).then(function() { loadData(); });
 }
 
-async function deleteKey(key) {
+function lockKey(key, deviceId) {
+  fetch('/api/admin/lock', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+    body: JSON.stringify({ key: key, deviceId: deviceId })
+  }).then(function() { loadData(); });
+}
+
+function unlockKey(key, deviceId) {
+  fetch('/api/admin/unlock', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+    body: JSON.stringify({ key: key, deviceId: deviceId })
+  }).then(function() { loadData(); });
+}
+
+function deleteKey(key) {
   if (!confirm('هل أنت متأكد من حذف هذا الكود نهائياً؟')) return;
-  await fetch('/api/admin/delete', {
+  fetch('/api/admin/delete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-    body: JSON.stringify({ key })
-  });
-  loadData();
+    body: JSON.stringify({ key: key })
+  }).then(function() { loadData(); });
 }
 
-async function resetKey(key) {
+function resetKey(key) {
   if (!confirm('هل تريد فك ارتباط الجهاز بهذا الكود ليمكن تفعيله على جهاز جديد؟')) return;
-  await fetch('/api/admin/reset', {
+  fetch('/api/admin/reset', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-    body: JSON.stringify({ key })
-  });
-  loadData();
+    body: JSON.stringify({ key: key })
+  }).then(function() { loadData(); });
 }
 
-async function purgeAllKeysPermanently() {
-  if (!confirm('⚠️ تحذير شديد الأهمية:\n\nهل أنت متأكد من قفل وتصفير جميع النسخ والأكواد السابقة نهائياً؟\nسيتم حظر وقفل كل الأجهزة السابقة فوراً ولن تفتح الأداة لأي شخص إلا بكود جديد تولده أنت!')) return;
-  try {
-    const res = await fetch('/api/admin/purge_all', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }
-    });
-    const data = await res.json();
-    localStorage.removeItem('ys_persistent_vault');
-    localStorage.removeItem('ys_persistent_vault_v2');
+function purgeAllKeysPermanently() {
+  if (!confirm('هل أنت متأكد من قفل وتصفير جميع النسخ والأكواد السابقة نهائياً؟')) return;
+  fetch('/api/admin/purge_all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
     alert(data.message || 'تم قفل وتصفير جميع الأكواد بنجاح!');
     loadData();
-  } catch (err) {
+  })
+  .catch(function() {
     alert('حدث خطأ أثناء الاتصال بالسيرفر');
-  }
+  });
 }
 
 function copyText(text) {
-  navigator.clipboard.writeText(text).then(() => {
+  navigator.clipboard.writeText(text).then(function() {
     alert('تم نسخ الكود بنجاح: ' + text);
   });
 }
@@ -875,33 +929,38 @@ function triggerRestore() {
   document.getElementById('restoreFileInput').click();
 }
 
-async function handleRestoreFile(input) {
-  const file = input.files[0];
+function handleRestoreFile(input) {
+  var file = input.files[0];
   if (!file) return;
-  try {
-    const text = await file.text();
-    const json = JSON.parse(text);
-    const res = await fetch('/api/admin/restore', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-      body: JSON.stringify(json)
-    });
-    const result = await res.json();
-    alert(result.message || 'تمت الاستعادة بنجاح');
-    loadData();
-  } catch (err) {
-    alert('ملف النسخة الاحتياطية غير صالح');
-  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var json = JSON.parse(e.target.result);
+      fetch('/api/admin/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+        body: JSON.stringify(json)
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(result) {
+        alert(result.message || 'تمت الاستعادة بنجاح');
+        loadData();
+      });
+    } catch (err) {
+      alert('ملف النسخة الاحتياطية غير صالح');
+    }
+  };
+  reader.readAsText(file);
 }
 
 function filterRows() {
-  const q = document.getElementById('search').value.toLowerCase();
-  const filtered = allKeys.filter(k => {
-    if (k.key.toLowerCase().includes(q)) return true;
-    return (k.activations || []).some(a => 
-      (a.device_name && a.device_name.toLowerCase().includes(q)) ||
-      (a.device_id && a.device_id.toLowerCase().includes(q))
-    );
+  var q = document.getElementById('search').value.toLowerCase();
+  var filtered = allKeys.filter(function(k) {
+    if (k.key.toLowerCase().indexOf(q) !== -1) return true;
+    return (k.activations || []).some(function(a) {
+      return (a.device_name && a.device_name.toLowerCase().indexOf(q) !== -1) ||
+             (a.device_id && a.device_id.toLowerCase().indexOf(q) !== -1);
+    });
   });
   renderTable(filtered);
 }
@@ -910,7 +969,7 @@ function filterRows() {
 </html>`);
 });
 
-// 🕵️ صفحة 404 للمسارات غير المعروفة (Stealth Mode)
+// صفحة 404 للمسارات غير المعروفة (Stealth Mode)
 app.use((req, res) => {
   res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;"><h1>404 Not Found</h1><p>The requested URL ' + req.originalUrl + ' was not found on this server.</p><hr><address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server</address></body></html>');
 });
