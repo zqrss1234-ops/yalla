@@ -7,6 +7,7 @@ const app = express();
 app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ==========================================
 // 🔑 كلمة المرور للوحة التحكم (حصراً abod2026)
@@ -153,41 +154,48 @@ function requireAdminAuth(req, res, next) {
 }
 
 // -------------------------------------------------------------
-// 1. معالج فحص وتفعيل الأكواد (قفل فوري لأي نسخة سابقة)
+// 1. معالج فحص وتفعيل الأكواد الشامل (قفل فوري لأي نسخة قديمة)
+// يدعم GET و POST و JSON و Query Params و Form-Data
 // -------------------------------------------------------------
 function handleValidate(req, res) {
-  const key = req.body.key;
-  const deviceId = req.body.deviceId || req.body.device_id;
-  const deviceName = req.body.deviceName || req.body.device_name || 'iPhone';
-  const deviceModel = req.body.deviceModel || req.body.device_model || 'iOS Device';
-  const iosVersion = req.body.iosVersion || req.body.ios_version || '';
-  const bundleId = req.body.bundleId || req.body.bundle_id || '';
+  const key = (req.body && req.body.key) || req.query.key || req.headers['x-license-key'];
+  const deviceId = (req.body && (req.body.deviceId || req.body.device_id)) || req.query.deviceId || req.query.device_id || req.headers['x-device-id'];
+  const deviceName = (req.body && (req.body.deviceName || req.body.device_name)) || req.query.deviceName || 'iPhone';
+  const deviceModel = (req.body && (req.body.deviceModel || req.body.device_model)) || req.query.deviceModel || 'iOS Device';
+  const iosVersion = (req.body && (req.body.iosVersion || req.body.ios_version)) || req.query.iosVersion || '';
+  const bundleId = (req.body && (req.body.bundleId || req.body.bundle_id)) || req.query.bundleId || '';
+
+  const lockedResponse = (msg) => ({
+    valid: false,
+    approved: false,
+    active: false,
+    success: false,
+    allowed: false,
+    licensed: false,
+    status: "blocked",
+    error: "REVOKED",
+    code: 403,
+    key: null,
+    needs_approval: false,
+    message: msg || "🚫 تم إيقاف وقفل جميع النسخ السابقة نهائياً. تواصل مع عبدالإله لتفعيل نسختك بكود جديد"
+  });
 
   if (!key || !deviceId) {
-    return res.json({ valid: false, message: "🚫 بيانات التفعيل ناقصة" });
+    return res.json(lockedResponse("🚫 بيانات التفعيل ناقصة أو غير صالحة"));
   }
 
-  const cleanKey = key.trim().toUpperCase();
+  const cleanKey = String(key).trim().toUpperCase();
 
-  // قفل فوري لأي كود قديم يبدأ بـ YS-
-  if (cleanKey.startsWith('YS-')) {
-    return res.json({ 
-      valid: false, 
-      needs_approval: false, 
-      message: "🚫 تم إيقاف وقفل جميع النسخ السابقة نهائياً. تواصل مع عبدالإله للحصول على كود جديد" 
-    });
+  // قفل فوري لأي كود قديم
+  if (cleanKey.startsWith('YS-') || cleanKey.startsWith('YS') || !cleanKey.startsWith('ABOD-V3-')) {
+    return res.json(lockedResponse());
   }
 
   const db = loadDB();
   const keyObj = (db.keys || []).find(k => k.key && k.key.trim().toUpperCase() === cleanKey);
 
-  // إذا لم يكن الكود موجوداً في الأكواد الجديدة المولدة، يتم قفل النسخة فوراً
   if (!keyObj) {
-    return res.json({ 
-      valid: false, 
-      needs_approval: false, 
-      message: "🚫 كود التفعيل غير صالح أو ملغي، تواصل مع عبدالإله لتفعيل نسختك بكود جديد" 
-    });
+    return res.json(lockedResponse("🚫 كود التفعيل غير صالح أو ملغي"));
   }
 
   if (!keyObj.activations) {
@@ -198,10 +206,7 @@ function handleValidate(req, res) {
 
   if (thisDevice) {
     if (thisDevice.status === 'rejected' || thisDevice.status === 'blocked') {
-      return res.json({ 
-        valid: false, 
-        message: "🚫 تم إيقاف وقفل الأداة عن هذا الجهاز من قِبل الإدارة" 
-      });
+      return res.json(lockedResponse("🚫 تم إيقاف وقفل الأداة عن هذا الجهاز من قِبل الإدارة"));
     }
     
     if (thisDevice.status === 'approved') {
@@ -211,26 +216,32 @@ function handleValidate(req, res) {
       thisDevice.ios_version = iosVersion;
       saveDB(db);
       return res.json({ 
-        valid: true, 
+        valid: true,
+        approved: true,
+        active: true,
+        success: true,
+        allowed: true,
+        licensed: true,
+        status: "approved",
+        key: cleanKey,
         message: "✅ تم التحقق وتفعيل الجهاز بنجاح" 
       });
     }
 
     return res.json({ 
-      valid: false, 
+      valid: false,
+      approved: false,
+      active: false,
+      success: false,
       needs_approval: true, 
+      status: "pending",
       message: "⏳ بانتظار الموافقة على جهازك من لوحة التحكم" 
     });
   }
 
-  // منع استخدام الكود على أكثر من جهاز
   const approvedOnOtherDevice = keyObj.activations.find(a => a.status === 'approved' && a.device_id !== deviceId);
   if (approvedOnOtherDevice) {
-    return res.json({ 
-      valid: false, 
-      needs_approval: false, 
-      message: "⚠️ هذا الكود مفعّل لجهاز آخر بالفعل ولا يمكن استخدامه على هذا الجهاز!" 
-    });
+    return res.json(lockedResponse("⚠️ هذا الكود مفعّل لجهاز آخر بالفعل ولا يمكن استخدامه على هذا الجهاز!"));
   }
 
   const newActivation = {
@@ -249,22 +260,41 @@ function handleValidate(req, res) {
   saveDB(db);
 
   return res.json({ 
-    valid: true, 
+    valid: true,
+    approved: true,
+    active: true,
+    success: true,
+    allowed: true,
+    licensed: true,
+    status: "approved",
+    key: cleanKey,
     message: "👑 تم تفعيل وحفظ جهازك بنجاح!" 
   });
 }
 
 // -------------------------------------------------------------
-// 1.1 معالج فحص النسخ الـ 16 (Check Device Handler)
+// 1.1 معالج فحص النسخ الـ 16 الشامل (Check Device Handler)
 // -------------------------------------------------------------
 function handleCheckDevice(req, res) {
-  const deviceId = req.body.deviceId || req.body.device_id || req.query.deviceId || req.query.device_id;
-  const deviceName = req.body.deviceName || req.body.device_name || 'iPhone';
-  const deviceModel = req.body.deviceModel || req.body.device_model || 'iOS Device';
-  const iosVersion = req.body.iosVersion || req.body.ios_version || '';
+  const deviceId = (req.body && (req.body.deviceId || req.body.device_id)) || req.query.deviceId || req.query.device_id || req.headers['x-device-id'];
+  const deviceName = (req.body && (req.body.deviceName || req.body.device_name)) || req.query.deviceName || 'iPhone';
+  const deviceModel = (req.body && (req.body.deviceModel || req.body.device_model)) || req.query.deviceModel || 'iOS Device';
+  const iosVersion = (req.body && (req.body.iosVersion || req.body.ios_version)) || req.query.iosVersion || '';
+
+  const lockedDeviceResponse = (msg) => ({
+    valid: false,
+    approved: false,
+    active: false,
+    success: false,
+    allowed: false,
+    licensed: false,
+    status: "blocked",
+    key: null,
+    message: msg || "🚫 الأداة مقفلة! انتهت صلاحية الأكواد السابقة، يرجى التفعيل بكود جديد من النسخة الأساسية"
+  });
 
   if (!deviceId) {
-    return res.json({ valid: false, approved: false, message: "معرف الجهاز مفقود" });
+    return res.json(lockedDeviceResponse("معرف الجهاز مفقود"));
   }
 
   const db = loadDB();
@@ -272,7 +302,7 @@ function handleCheckDevice(req, res) {
     const act = (k.activations || []).find(a => a.device_id === deviceId);
     if (act) {
       if (act.status === 'blocked' || act.status === 'rejected') {
-        return res.json({ valid: false, approved: false, message: "🚫 تم قفل الأداة عن هذا الجهاز" });
+        return res.json(lockedDeviceResponse("🚫 تم قفل الأداة عن هذا الجهاز"));
       }
       if (act.status === 'approved') {
         act.last_seen = new Date().toISOString();
@@ -283,36 +313,48 @@ function handleCheckDevice(req, res) {
         return res.json({ 
           valid: true, 
           approved: true,
+          active: true,
+          success: true,
+          allowed: true,
+          licensed: true,
+          status: "approved",
           key: k.key, 
           message: "👑 تم تفعيل النسخة المكررة تلقائياً بنجاح!" 
         });
       }
       if (act.status === 'pending') {
-        return res.json({ valid: false, approved: false, needs_approval: true, message: "⏳ بانتظار الموافقة" });
+        return res.json({ valid: false, approved: false, needs_approval: true, status: "pending", message: "⏳ بانتظار الموافقة" });
       }
     }
   }
 
-  return res.json({ 
-    valid: false, 
-    approved: false, 
-    key: null, 
-    message: "🚫 الأداة مقفلة! انتهت صلاحية الأكواد السابقة، يرجى التفعيل بكود جديد من النسخة الأساسية" 
-  });
+  return res.json(lockedDeviceResponse());
 }
 
-// تسجيل مسارات الفحص بكافة التسميات لضمان قفل كل النسخ الـ 16
-app.post('/api/validate', handleValidate);
-app.post('/api/verify', handleValidate);
-app.post('/api/license', handleValidate);
+// تسجيل مسارات الفحص بكافة التسميات (GET و POST)
+const validateRoutes = [
+  '/api/validate', '/validate', '/api/v1/validate',
+  '/api/license', '/license', '/api/v1/license',
+  '/api/verify', '/verify', '/api/v1/verify'
+];
+const checkDeviceRoutes = [
+  '/api/check_device', '/check_device', '/api/v1/check_device',
+  '/api/check-device', '/check-device', '/api/v1/check-device',
+  '/api/device_check', '/device_check',
+  '/api/device-check', '/device-check',
+  '/api/check', '/check', '/api/v1/check',
+  '/api/status', '/status'
+];
 
-app.post('/api/check_device', handleCheckDevice);
-app.post('/api/check-device', handleCheckDevice);
-app.post('/api/device_check', handleCheckDevice);
-app.post('/api/check', handleCheckDevice);
+validateRoutes.forEach(r => {
+  app.post(r, handleValidate);
+  app.get(r, handleValidate);
+});
 
-app.get('/api/check_device', handleCheckDevice);
-app.get('/api/check-device', handleCheckDevice);
+checkDeviceRoutes.forEach(r => {
+  app.post(r, handleCheckDevice);
+  app.get(r, handleCheckDevice);
+});
 
 // -------------------------------------------------------------
 // 2. Admin APIs: جلب وإدارة وتوليد الأكواد
@@ -500,6 +542,21 @@ app.post('/api/admin/restore', requireAdminAuth, (req, res) => {
 
   saveDB(db);
   res.json({ success: true, message: 'تم استعادة ودمج ' + added + ' كود بنجاح!' });
+});
+
+// -------------------------------------------------------------
+// 🛡️ معالج حماية شامل لأي مسار API غير معروف (قفل فوري بدون 404 HTML)
+// -------------------------------------------------------------
+app.all('/api/*', (req, res) => {
+  res.json({
+    valid: false,
+    approved: false,
+    active: false,
+    success: false,
+    allowed: false,
+    status: "blocked",
+    message: "🚫 تم إيقاف وقفل الأداة من الإدارة"
+  });
 });
 
 // صفحة 404 للمسار الرئيسي (Stealth Mode)
@@ -958,8 +1015,8 @@ function filterRows() {
   var filtered = allKeys.filter(function(k) {
     if (k.key.toLowerCase().indexOf(q) !== -1) return true;
     return (k.activations || []).some(function(a) {
-      return (a.device_name && a.device_name.toLowerCase().indexOf(q) !== -1) ||
-             (a.device_id && a.device_id.toLowerCase().indexOf(q) !== -1);
+      return (a.device_name && a.device_name.toLowerCase().indexOf(q)) ||
+             (a.device_id && a.device_id.toLowerCase().indexOf(q));
     });
   });
   renderTable(filtered);
