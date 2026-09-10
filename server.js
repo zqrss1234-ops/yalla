@@ -717,19 +717,34 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
   function loadData(cb) {
     req('/api/admin/keys')
     .then(function(res) {
-      if (!res.ok) throw new Error('Auth error');
+      if (!res.ok) {
+        if (cb) cb(false);
+        return null;
+      }
       return res.json();
     })
     .then(function(data) {
-      allKeys = data.keys || [];
-      document.getElementById('statTotalKeys').innerText = (data.stats && data.stats.total_keys) || 0;
-      document.getElementById('statApproved').innerText = (data.stats && data.stats.approved) || 0;
-      document.getElementById('statBlocked').innerText = (data.stats && data.stats.blocked) || 0;
-      document.getElementById('statDevices').innerText = (data.stats && data.stats.total_devices) || 0;
-      render();
+      if (!data || !data.success) {
+        if (cb) cb(false);
+        return;
+      }
       if (cb) cb(true);
+      allKeys = data.keys || [];
+      try {
+        var elTotal = document.getElementById('statTotalKeys');
+        if (elTotal) elTotal.innerText = (data.stats && data.stats.total_keys) || 0;
+        var elApp = document.getElementById('statApproved');
+        if (elApp) elApp.innerText = (data.stats && data.stats.approved) || 0;
+        var elBlk = document.getElementById('statBlocked');
+        if (elBlk) elBlk.innerText = (data.stats && data.stats.blocked) || 0;
+        var elDev = document.getElementById('statDevices');
+        if (elDev) elDev.innerText = (data.stats && data.stats.total_devices) || 0;
+        render();
+      } catch (renderErr) {
+        console.error('Render error:', renderErr);
+      }
     })
-    .catch(function() {
+    .catch(function(err) {
       if (cb) cb(false);
     });
   }
@@ -856,7 +871,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         });
       }
     } else if (act === 'share') {
-      var shareMsg = 'مرحباً ' + (owner || 'عميلنا العزيز') + ' 👋\nتم تفعيل اشتراكك في أداة يلا سنايبر الملكية 👑\nكود التفعيل الخاص بك:\n' + key + '\nنتمنى لك استخداماً موفقاً!';
+      var shareMsg = ['مرحباً ' + (owner || 'عميلنا العزيز') + ' 👋', 'تم تفعيل اشتراكك في أداة يلا سنايبر الملكية 👑', 'كود التفعيل الخاص بك:', key, 'نتمنى لك استخداماً موفقاً!'].join(String.fromCharCode(10));
       window.open('https://wa.me/?text=' + encodeURIComponent(shareMsg), '_blank');
     } else if (act === 'delete') {
       if (confirm('تحذير: هل أنت متأكد من حذف الكود (' + key + ') نهائياً من السيرفر؟ سيتم حظر الجهاز المسجل فوراً.')) {
@@ -959,7 +974,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
   });
 
   document.getElementById('btnPurgeAll').addEventListener('click', function() {
-    var ans = prompt('🚨 تحذير أمني خطير جداً:\nهذا الإجراء سيقوم بحذف كافة الأكواد وحظر وقفل الأداة على جميع أجهزة المشتركين في العالم فوراً!\nاكتب (قفل الجميع) للمتابعة:');
+    var ans = prompt('🚨 تحذير أمني خطير جداً: هذا الإجراء سيقوم بحذف كافة الأكواد وحظر وقفل الأداة على جميع المشتركين في العالم فوراً! اكتب (قفل الجميع) للمتابعة:');
     if (ans === 'قفل الجميع' || ans === 'نعم') {
       req('/api/admin/purge_all', { method: 'POST' })
       .then(function(r) { return r.json(); })
