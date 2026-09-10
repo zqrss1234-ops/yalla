@@ -25,7 +25,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // ==========================================
 // 🔑 كلمة المرور للوحة التحكم (حصراً abod2026)
 // ==========================================
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "abod2026";
+const ADMIN_TOKEN = "abod2026";
 const ADMIN_PATH = process.env.ADMIN_PATH || "abod-master-7788";
 const JWT_SECRET_SALT = process.env.JWT_SECRET || "ABOD_V4_SECURE_SALT_998877665544332211";
 
@@ -159,16 +159,17 @@ function requireAdminAuth(req, res, next) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     token = authHeader.replace('Bearer ', '').trim();
   } else if (req.query && req.query.token) {
-    token = req.query.token.trim();
+    token = String(req.query.token).trim();
   } else if (req.body && req.body.token) {
-    token = req.body.token.trim();
+    token = String(req.body.token).trim();
   }
 
-  if (token !== ADMIN_TOKEN) {
-    return res.status(403).json({ success: false, message: "🚫 غير مصرح لك بالدخول" });
+  // السماح بكلمة المرور abod2026 دائماً وبلا أي استثناء
+  if (token === "abod2026" || token === ADMIN_TOKEN || token === (process.env.ADMIN_TOKEN || "").trim()) {
+    return next();
   }
 
-  next();
+  return res.status(403).json({ success: false, message: "🚫 غير مصرح لك بالدخول" });
 }
 
 function extractRequestParams(req) {
@@ -1034,8 +1035,8 @@ app.get('/' + ADMIN_PATH, (req, res) => {
   <div class="login-card">
     <h2>👑 عبدالإله</h2>
     <p>لوحة التحكم الملكية والتحكم بالأجهزة</p>
-    <input type="password" id="adminPasswordInput" placeholder="أدخل كلمة المرور..." onkeydown="if(event.key==='Enter') login()">
-    <button onclick="login()">دخول آمن</button>
+    <input type="password" id="adminPassInput" placeholder="أدخل كلمة المرور (abod2026)" onkeydown="if(event.key==='Enter') doLogin()">
+    <button onclick="doLogin()">تسجيل الدخول</button>
   </div>
 </div>
 
@@ -1049,7 +1050,7 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     <button class="btn btn-outline" onclick="exportBackup()">💾 نسخ احتياطي</button>
     <button class="btn btn-outline" onclick="document.getElementById('restoreInput').click()">📥 استعادة</button>
     <input type="file" id="restoreInput" style="display:none" onchange="importBackup(event)" accept=".json">
-    <button class="btn btn-danger" onclick="purgeAllPrompt()">🚨 تصفير وقفل شامل للجميع</button>
+    <button class="btn btn-danger" onclick="purgeAllCodes()">🚨 تصفير وقفل شامل للجميع</button>
   </div>
 </header>
 
@@ -1190,19 +1191,32 @@ function formatDeviceModel(raw) {
   return IPHONE_NAMES[raw] || raw;
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  if (authToken) {
-    document.getElementById('loginOverlay').style.display = 'none';
-    loadData();
-    setInterval(loadData, 10000);
-  } else {
-    document.getElementById('loginOverlay').style.display = 'flex';
-  }
-});
+if (authToken) {
+  fetch('/api/admin/keys', {
+    headers: { 'Authorization': 'Bearer ' + authToken }
+  }).then(res => {
+    if (res.ok) {
+      document.getElementById('loginOverlay').style.display = 'none';
+      loadData();
+    } else {
+      sessionStorage.removeItem('abod_v4_admin_token');
+      authToken = '';
+    }
+  }).catch(() => {});
+}
 
-async function login() {
-  const token = document.getElementById('adminPasswordInput').value.trim();
-  if (!token) return;
+function doLogin() {
+  const p = document.getElementById('adminPassInput').value.trim();
+  if (!p) {
+    alert('يرجى إدخال كلمة المرور');
+    return;
+  }
+  testToken(p);
+}
+
+async function testToken(token) {
+  const btn = document.querySelector('#loginOverlay button');
+  if (btn) btn.innerText = 'جاري التحقق...';
   try {
     const res = await fetch('/api/admin/keys', {
       headers: { 'Authorization': 'Bearer ' + token }
@@ -1213,10 +1227,12 @@ async function login() {
       document.getElementById('loginOverlay').style.display = 'none';
       loadData();
     } else {
-      alert('كلمة المرور غير صحيحة!');
+      alert('كلمة المرور غير صحيحة! تأكد من كتابة abod2026');
+      if (btn) btn.innerText = 'تسجيل الدخول';
     }
   } catch (e) {
-    alert('تعذر الاتصال بالسيرفر');
+    alert('تعذر الاتصال بالسيرفر أو جاري تشغيل السيرفر، انتظر ثوانٍ وجرب مجدداً.');
+    if (btn) btn.innerText = 'تسجيل الدخول';
   }
 }
 
@@ -1411,16 +1427,12 @@ async function deleteKeyPermanent(key) {
   loadData();
 }
 
-// تصفير شامل وقفل الجميع
-async function purgeAllPrompt() {
-  const pass = prompt('🚨 تحذير شديد: سيتم قفل وإلغاء صلاحية جميع النسخ والأجهزة فوراً! أكتب كلمة المرور للتأكيد:');
-  if (pass !== 'abod2026') {
-    if (pass !== null) alert('كلمة المرور غير صحيحة!');
-    return;
-  }
+// تصفير شامل
+async function purgeAllCodes() {
+  if (!confirm('🚨 تحذير شديد الخطورة: هل تريد قفل وإلغاء جميع الأكواد وتصفير قاعدة البيانات بالكامل؟ ستتوقف الأداة عند جميع المشتركين بدون استثناء!')) return;
   const res = await fetch('/api/admin/purge_all', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }
+    headers: { 'Authorization': 'Bearer ' + authToken }
   });
   const data = await res.json();
   alert(data.message);
