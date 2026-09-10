@@ -23,28 +23,79 @@ const JWT_SECRET_SALT = process.env.JWT_SECRET || "ABOD_V5_SECURE_HMAC_SECRET_20
 const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || "";
 
 const DB_FILE = path.join(__dirname, 'database.json');
-let memoryDB = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+const LIC_FILE = path.join(__dirname, 'licenses.json');
+try {
+  if (fs.existsSync(LIC_FILE)) {
+    fs.writeFileSync(LIC_FILE, JSON.stringify([], null, 2), 'utf8');
+  }
+} catch (e) {}
+
+const DEFAULT_BLACKLIST_KEYS = [
+  {"key": "YS-I08F-FG86", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "77KF-97C5-EHXK-WGC4", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-DLT3-5G7J", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "ABOD-TJ4Q-MGY1-TOSS", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "ABOD-APJQ-N0QO-C1RP", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-5SA3-5Y88", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-T2AI-B5WV", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-3A85-UBPK", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "4ZWD-CMMC-WVDG-YMD2", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-PYZ6-SA5K", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-KEV1-VYFK", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "ABOD-44N4-G4KR-PD69", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-1KKZ-MUH6", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-N6N5-5E96", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-8COZ-V9MV", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-6UY7-PMMX", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-NN90-J74G", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-BLX0-MV1X", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "X9BJ-3F8E-FWXH-3TP3", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "L8H5-X3NJ-LRFX-2QR5", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "ABOD-C48E-WD4X-OTYZ", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-T33Q-PBF7", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-11UM-YU4W", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-C30E-ZSWA", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "X6CY-BXEH-HQ6D-BJ3M", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-9YZQ-H3OZ", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-Y3XR-Q8HU", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-Y01W-5V6Y", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-WNQM-P81V", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-Z2QM-SEZ9", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-LRQ1-SVNM", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-SCQ8-H41T", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-RZQV-B5OX", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-UK3N-9X61", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-CDAN-X6PO", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-IVN7-D3RA", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-J4UK-H8B8", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-SFW5-351D", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
+  {"key": "YS-Q6RP-G109", "status": "blocked", "active": false, "owner": "محظور", "devices": []}
+];
+
+const BLACKLIST_KEY_SET = new Set(DEFAULT_BLACKLIST_KEYS.map(k => k.key.toUpperCase()));
+
+let memoryDB = { epoch: CURRENT_EPOCH, keys: DEFAULT_BLACKLIST_KEYS, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
 let isMongoActive = false;
 let mongoCollection = null;
 
 function loadLocalFileDB() {
   if (!fs.existsSync(DB_FILE)) {
-    const init = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+    const init = { epoch: CURRENT_EPOCH, keys: DEFAULT_BLACKLIST_KEYS, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
     saveLocalDB(init);
     return init;
   }
   try {
     const parsed = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    if (!parsed.keys) parsed.keys = [];
+    if (!parsed.keys || !Array.isArray(parsed.keys)) parsed.keys = DEFAULT_BLACKLIST_KEYS;
     if (parsed.epoch !== CURRENT_EPOCH) {
-      parsed.keys = [];
+      parsed.keys = DEFAULT_BLACKLIST_KEYS;
       parsed.epoch = CURRENT_EPOCH;
       parsed.secretSalt = JWT_SECRET_SALT;
       saveLocalDB(parsed);
     }
     return parsed;
   } catch (e) {
-    return { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+    return { epoch: CURRENT_EPOCH, keys: DEFAULT_BLACKLIST_KEYS, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
   }
 }
 
@@ -68,15 +119,15 @@ if (MONGO_URI) {
       mongoCollection = client.db('yallasniper_cloud').collection('system_state');
       isMongoActive = true;
       const doc = await mongoCollection.findOne({ _id: 'master_license_store' });
-      if (doc && doc.epoch === CURRENT_EPOCH) {
-        memoryDB = { epoch: CURRENT_EPOCH, keys: doc.keys || [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+      if (doc && doc.epoch === CURRENT_EPOCH && doc.keys && doc.keys.length > 0) {
+        memoryDB = { epoch: CURRENT_EPOCH, keys: doc.keys, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
       } else {
         await mongoCollection.updateOne(
           { _id: 'master_license_store' },
-          { $set: { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
+          { $set: { epoch: CURRENT_EPOCH, keys: DEFAULT_BLACKLIST_KEYS, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
           { upsert: true }
         );
-        memoryDB = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+        memoryDB = { epoch: CURRENT_EPOCH, keys: DEFAULT_BLACKLIST_KEYS, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
       }
       saveLocalDB(memoryDB);
     } catch (err) {
@@ -110,16 +161,16 @@ function sendUniversalLockdown(res) {
     success: false,
     valid: false,
     action: "lock",
-    message: "All previous keys have been terminated",
     authorized: false,
-    approved: false,
     active: false,
+    error: "Key Terminated",
+    message: "Key Terminated",
+    approved: false,
     allowed: false,
     licensed: false,
     killswitch: true,
     disabled: true,
     code: 403,
-    error: "REVOKED",
     key: null,
     config: {
       global_enabled: false,
@@ -137,16 +188,16 @@ function buildLockedResponse(msg) {
     success: false,
     valid: false,
     action: "lock",
-    message: "All previous keys have been terminated",
     authorized: false,
-    approved: false,
     active: false,
+    error: "Key Terminated",
+    message: msg || "Key Terminated",
+    approved: false,
     allowed: false,
     licensed: false,
     killswitch: true,
     disabled: true,
     code: 403,
-    error: "REVOKED",
     key: null,
     config: {
       global_enabled: false,
@@ -201,6 +252,21 @@ async function handleCheckDevice(req, res) {
 }
 
 async function handleValidate(req, res) {
+  const { key } = extractDevicePayload(req);
+  if (!key) return sendUniversalLockdown(res);
+
+  const cleanKey = key.trim().toUpperCase();
+  if (BLACKLIST_KEY_SET.has(cleanKey)) {
+    return sendUniversalLockdown(res);
+  }
+
+  const db = memoryDB;
+  if (!db || !Array.isArray(db.keys)) return sendUniversalLockdown(res);
+  const keyObj = db.keys.find(k => k && k.key && k.key.toUpperCase() === cleanKey);
+  if (!keyObj || keyObj.active !== true || keyObj.status !== 'active') {
+    return sendUniversalLockdown(res);
+  }
+
   return sendUniversalLockdown(res);
 }
 
@@ -365,9 +431,9 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
 <div class="container">
   <div class="stats-grid">
-    <div class="stat-card"><div class="stat-title">إجمالي الأكواد</div><div class="stat-value" id="statTotalKeys">0</div></div>
+    <div class="stat-card"><div class="stat-title">إجمالي الأكواد</div><div class="stat-value" id="statTotalKeys">39</div></div>
     <div class="stat-card"><div class="stat-title">الأكواد النشطة</div><div class="stat-value" style="color:#10b981;" id="statApproved">0</div></div>
-    <div class="stat-card"><div class="stat-title">المحظورة / المقفلة</div><div class="stat-value" style="color:#ef4444;" id="statBlocked">0</div></div>
+    <div class="stat-card"><div class="stat-title">المحظورة / المقفلة</div><div class="stat-value" style="color:#ef4444;" id="statBlocked">39</div></div>
     <div class="stat-card"><div class="stat-title">حالة السحابة</div><div class="stat-value" style="font-size:18px; margin-top:6px;" id="statCloud">فحص...</div></div>
   </div>
 
@@ -464,11 +530,11 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     for (var i = 0; i < list.length; i++) {
       var k = list[i];
       var isBlock = (k.status === 'blocked' || k.active === false);
-      var exp = k.expiresAt ? new Date(k.expiresAt).toLocaleDateString('ar-SA') : 'دائم';
+      var exp = k.expiresAt ? new Date(k.expiresAt).toLocaleDateString('ar-SA') : 'ملغي / محظور';
       var devCount = (k.devices && k.devices.length) ? (k.devices.length + ' جهاز') : 'لا يوجد';
       h += '<tr>' +
         '<td><span class="key-badge">' + k.key + '</span></td>' +
-        '<td><strong>' + (k.owner || 'مستخدم') + '</strong></td>' +
+        '<td><strong>' + (k.owner || 'محظور') + '</strong></td>' +
         '<td>' + (isBlock ? '<span class="badge-blocked">محظور 🛑</span>' : '<span class="badge-active">نشط ✅</span>') + '</td>' +
         '<td>' + exp + '</td>' +
         '<td>' + devCount + '</td>' +
