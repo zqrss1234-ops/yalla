@@ -152,20 +152,31 @@ function buildLockedResponse(msg) {
   };
 }
 
+function normalizeToken(str) {
+  if (!str) return '';
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .replace(/[\u0660-\u0669]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x0660 + 48))
+    .replace(/[\u06F0-\u06F9]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x06F0 + 48))
+    .replace(/[-\s_]/g, '');
+}
+
 function requireAdminAuth(req, res, next) {
   const authHeader = req.headers['authorization'];
   let token = null;
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     token = authHeader.replace('Bearer ', '').trim();
-  } else if (req.query && req.query.token) {
-    token = String(req.query.token).trim();
-  } else if (req.body && req.body.token) {
-    token = String(req.body.token).trim();
+  } else if (req.query && (req.query.token || req.query.pass || req.query.password)) {
+    token = String(req.query.token || req.query.pass || req.query.password).trim();
+  } else if (req.body && (req.body.token || req.body.pass || req.body.password)) {
+    token = String(req.body.token || req.body.pass || req.body.password).trim();
   }
 
-  // السماح بكلمة المرور abod2026 دائماً وبلا أي استثناء
-  if (token === "abod2026" || token === ADMIN_TOKEN || token === (process.env.ADMIN_TOKEN || "").trim()) {
+  const norm = normalizeToken(token);
+  // قبول كلمة المرور abod2026 بكافة أشكالها (حروف كبيرة، صغيرة، أرقام عربية، مسافات)
+  if (norm === "abod2026" || token === ADMIN_TOKEN || token === (process.env.ADMIN_TOKEN || "").trim()) {
     return next();
   }
 
@@ -245,13 +256,13 @@ function handleValidate(req, res) {
       saveDB(db);
       return res.json({ 
         valid: true, 
-        approved: true,
-        active: true,
-        success: true,
-        allowed: true,
-        licensed: true,
-        status: "approved",
-        key: cleanKey,
+        approved: true, 
+        active: true, 
+        success: true, 
+        allowed: true, 
+        licensed: true, 
+        status: "approved", 
+        key: cleanKey, 
         owner_name: keyObj.owner_name || "",
         message: "✅ تم التحقق وتفعيل الجهاز بنجاح" 
       });
@@ -1027,7 +1038,7 @@ const DASHBOARD_PAGE_HTML = `<!DOCTYPE html>
   <div class="login-card">
     <h2>عبدالإله 👑</h2>
     <p>لوحة التحكم المركزية وإدارة التراخيص</p>
-    <input type="password" id="adminPassInput" placeholder="أدخل كلمة المرور" onkeydown="if(event.key==='Enter') doLogin()">
+    <input type="text" id="adminPassInput" placeholder="أدخل كلمة المرور (abod2026)" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') doLogin()">
     <button onclick="doLogin()">تسجيل الدخول</button>
   </div>
 </div>
@@ -1183,24 +1194,35 @@ function formatDeviceModel(raw) {
   return IPHONE_NAMES[raw] || raw;
 }
 
-if (authToken) {
-  fetch('/api/admin/keys', {
-    headers: { 'Authorization': 'Bearer ' + authToken }
-  }).then(res => {
-    if (res.ok) {
-      document.getElementById('loginOverlay').style.display = 'none';
-      loadData();
-    } else {
-      sessionStorage.removeItem('abod_v4_admin_token');
-      authToken = '';
-    }
-  }).catch(() => {});
+function normalizeToken(str) {
+  if (!str) return '';
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .replace(/[\u0660-\u0669]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x0660 + 48))
+    .replace(/[\u06F0-\u06F9]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x06F0 + 48))
+    .replace(/[-\s_]/g, '');
 }
 
+// تسجيل الدخول التلقائي في حال تم فتح الرابط بـ ?pass=abod2026 أو وجود توكن سابق
+window.addEventListener('DOMContentLoaded', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlPass = urlParams.get('pass') || urlParams.get('token');
+  if (urlPass) {
+    const norm = normalizeToken(urlPass);
+    const inp = document.getElementById('adminPassInput');
+    if (inp) inp.value = norm;
+    testToken(norm);
+  } else if (authToken) {
+    testToken(authToken);
+  }
+});
+
 function doLogin() {
-  const p = document.getElementById('adminPassInput').value.trim();
+  const raw = document.getElementById('adminPassInput').value;
+  const p = normalizeToken(raw);
   if (!p) {
-    alert('يرجى إدخال كلمة المرور');
+    alert('يرجى إدخال كلمة المرور abod2026');
     return;
   }
   testToken(p);
@@ -1413,7 +1435,7 @@ async function deleteKeyPermanent(key) {
 
 async function purgeAllPrompt() {
   const pass = prompt('🚨 تحذير: سيتم قفل وإلغاء جميع النسخ والأكواد فوراً! اكتب كلمة المرور للتأكيد:');
-  if (pass !== 'abod2026') {
+  if (normalizeToken(pass) !== 'abod2026') {
     if (pass !== null) alert('كلمة المرور غير صحيحة!');
     return;
   }
@@ -1482,9 +1504,17 @@ function filterRows() {
 </body>
 </html>`;
 
-app.get(['/' + ADMIN_PATH, '/abod', '/admin'], (req, res) => {
+app.get(['/' + ADMIN_PATH, '/abod', '/admin', '/login'], (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(DASHBOARD_PAGE_HTML);
+});
+
+// توجيه تلقائي إذا فتح المستخدم الرابط الرئيسي ومعه كلمة المرور
+app.get('/', (req, res, next) => {
+  if (req.query && (req.query.pass || req.query.token)) {
+    return res.redirect('/' + ADMIN_PATH + '?pass=' + encodeURIComponent(req.query.pass || req.query.token));
+  }
+  next();
 });
 
 // أي مسار API أو طلب POST غير معتمد يُرد عليه فوراً بكود قفل متوافق مع كافة الإصدارات القديمة والجديدة
