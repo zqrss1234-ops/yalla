@@ -99,12 +99,19 @@ async function persistDB(data) {
   }
 }
 
-function buildLockedResponse(msg) {
-  return {
-    status: "error",
+function sendUniversalLockdown(res) {
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+  });
+  return res.status(200).json({
+    status: "revoked",
     success: false,
-    authorized: false,
     valid: false,
+    action: "lock",
+    message: "All previous keys have been terminated",
+    authorized: false,
     approved: false,
     active: false,
     allowed: false,
@@ -113,7 +120,34 @@ function buildLockedResponse(msg) {
     disabled: true,
     code: 403,
     error: "REVOKED",
-    message: msg || "Subscription expired or key invalid",
+    key: null,
+    config: {
+      global_enabled: false,
+      run_enabled: false,
+      dashboard_enabled: false,
+      allow_legacy_mode: false,
+      killswitch: true
+    }
+  });
+}
+
+function buildLockedResponse(msg) {
+  return {
+    status: "revoked",
+    success: false,
+    valid: false,
+    action: "lock",
+    message: "All previous keys have been terminated",
+    authorized: false,
+    approved: false,
+    active: false,
+    allowed: false,
+    licensed: false,
+    killswitch: true,
+    disabled: true,
+    code: 403,
+    error: "REVOKED",
+    key: null,
     config: {
       global_enabled: false,
       run_enabled: false,
@@ -163,101 +197,11 @@ function extractDevicePayload(req) {
 }
 
 async function handleCheckDevice(req, res) {
-  const { deviceId, deviceName, deviceModel, iosVersion, bundleId } = extractDevicePayload(req);
-  if (!deviceId) return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-
-  const db = memoryDB;
-  let boundKey = null;
-  if (db && Array.isArray(db.keys)) {
-    for (const k of db.keys) {
-      if (k && k.status === 'active' && k.active === true && k.key && k.key.toUpperCase().startsWith("ABOD-") && k.devices && Array.isArray(k.devices)) {
-        const dev = k.devices.find(d => d && d.deviceId === deviceId);
-        if (dev) { boundKey = { keyObj: k, devObj: dev }; break; }
-      }
-    }
-  }
-
-  if (!boundKey) return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-  const { keyObj, devObj } = boundKey;
-
-  if (keyObj.status !== 'active' || keyObj.active !== true) return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-  if (devObj.status === 'blocked' || devObj.approved === false) return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-
-  if (keyObj.expiresAt) {
-    const exp = new Date(keyObj.expiresAt).getTime();
-    if (!isNaN(exp) && Date.now() > exp) return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-  }
-
-  devObj.lastSeen = new Date().toISOString();
-  if (deviceName) devObj.deviceName = deviceName;
-  if (deviceModel) devObj.deviceModel = deviceModel;
-  if (iosVersion) devObj.iosVersion = iosVersion;
-  if (bundleId) devObj.bundleId = bundleId;
-  await persistDB(db);
-
-  return res.status(200).json({
-    status: "approved", message: "تم تفعيل الجهاز بنجاح",
-    valid: true, approved: true, active: true, success: true, authorized: true, allowed: true, licensed: true,
-    code: 200, key: keyObj.key, owner: keyObj.owner || "مستخدم", device_status: "approved"
-  });
+  return sendUniversalLockdown(res);
 }
 
 async function handleValidate(req, res) {
-  const { key, deviceId, deviceName, deviceModel, iosVersion, bundleId } = extractDevicePayload(req);
-  if (!key || typeof key !== 'string' || !key.trim() || !key.trim().toUpperCase().startsWith("ABOD-")) {
-    return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-  }
-
-  const cleanKey = key.trim().toUpperCase();
-  const db = memoryDB;
-  if (!db || !Array.isArray(db.keys)) {
-    return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-  }
-
-  const keyObj = db.keys.find(k => k && k.key && k.key.toUpperCase() === cleanKey);
-  if (!keyObj) {
-    return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-  }
-
-  if (keyObj.status !== 'active' || keyObj.active !== true) {
-    return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-  }
-
-  if (keyObj.expiresAt) {
-    const exp = new Date(keyObj.expiresAt).getTime();
-    if (!isNaN(exp) && Date.now() > exp) {
-      return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-    }
-  }
-
-  if (deviceId) {
-    if (!keyObj.devices) keyObj.devices = [];
-    let devObj = keyObj.devices.find(d => d && d.deviceId === deviceId);
-    if (devObj) {
-      if (devObj.status === 'blocked' || devObj.approved === false) {
-        return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
-      }
-      devObj.lastSeen = new Date().toISOString();
-    } else {
-      const maxSlots = keyObj.maxDevices || 1;
-      if (keyObj.devices.length >= maxSlots) {
-        return res.status(403).json(buildLockedResponse(`Subscription expired or key invalid - max devices reached (${maxSlots})`));
-      }
-      devObj = {
-        deviceId, deviceName: deviceName || "iPhone", deviceModel: deviceModel || "Apple Device",
-        iosVersion: iosVersion || "iOS", bundleId: bundleId || "com.yalla.lite",
-        status: "approved", approved: true, firstActivated: new Date().toISOString(), lastSeen: new Date().toISOString()
-      };
-      keyObj.devices.push(devObj);
-    }
-    await persistDB(db);
-    return res.status(200).json({
-      status: "approved", message: "تم تفعيل الكود بنجاح",
-      valid: true, approved: true, active: true, success: true, authorized: true, allowed: true, licensed: true,
-      code: 200, key: keyObj.key, owner: keyObj.owner || "مستخدم", expiresAt: keyObj.expiresAt || null, device: devObj
-    });
-  }
-  return res.status(403).json(buildLockedResponse("Subscription expired or key invalid"));
+  return sendUniversalLockdown(res);
 }
 
 const checkRoutes = [
@@ -661,8 +605,8 @@ app.get('/', (req, res, next) => {
   next();
 });
 
-app.all('/api/*', (req, res) => res.status(403).json(buildLockedResponse("Subscription expired or key invalid")));
-app.post('*', (req, res) => res.status(403).json(buildLockedResponse("Subscription expired or key invalid")));
+app.all('/api/*', (req, res) => sendUniversalLockdown(res));
+app.post('*', (req, res) => sendUniversalLockdown(res));
 
 app.use((req, res) => {
   res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;"><h1>404 Not Found</h1><p>The requested URL ' + req.originalUrl + ' was not found on this server.</p><hr><address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server</address></body></html>');
