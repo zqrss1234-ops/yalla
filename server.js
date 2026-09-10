@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -15,13 +16,10 @@ app.use((req, res, next) => {
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.setHeader('Surrogate-Control', 'no-store');
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key, x-hwid, x-device-id');
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
+app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -39,7 +37,7 @@ let isMongoActive = false;
 let mongoCollection = null;
 
 // ============================================================
-// 📱 قاموس ترجمة معرفات أجهزة الآيفون الدقيق
+// 📱 قاموس ترجمة موديلات أجهزة الآيفون الدقيق
 // ============================================================
 const APPLE_DEVICE_MAP = {
   'iPhone17,1': 'iPhone 16 Pro',
@@ -76,15 +74,7 @@ const APPLE_DEVICE_MAP = {
   'iPhone10,2': 'iPhone 8 Plus',
   'iPhone10,5': 'iPhone 8 Plus',
   'iPhone12,8': 'iPhone SE (2nd Gen)',
-  'iPhone14,6': 'iPhone SE (3rd Gen)',
-  'iPhone9,1': 'iPhone 7',
-  'iPhone9,3': 'iPhone 7',
-  'iPhone9,2': 'iPhone 7 Plus',
-  'iPhone9,4': 'iPhone 7 Plus',
-  'iPad13,18': 'iPad (10th Gen)',
-  'iPad13,19': 'iPad (10th Gen)',
-  'iPad14,1': 'iPad mini (6th Gen)',
-  'iPad14,2': 'iPad mini (6th Gen)'
+  'iPhone14,6': 'iPhone SE (3rd Gen)'
 };
 
 function formatAppleDeviceModel(rawModel) {
@@ -577,3 +567,448 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 <div id="loginModal" class="modal-overlay">
   <div class="login-card">
     <div style="font-size: 52px; margin-bottom: 10px;">👑</div>
+    <h2 style="font-weight: 900; font-size: 22px; margin-bottom: 6px;">لوحة تحكم عبدالإله</h2>
+    <p style="color: var(--text-muted); font-size: 13.5px; margin-bottom: 20px;">أدخل كلمة المرور الإدارية للمتابعة</p>
+    <div id="loginError" style="display:none; color: #fca5a5; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px; border-radius: 8px; margin-bottom: 14px; font-size: 13px;"></div>
+    <div style="position: relative; margin-bottom: 16px;">
+      <input type="password" id="adminPassInput" placeholder="أدخل كلمة المرور" style="width:100%; text-align:center; font-size:16px; padding:12px; border-radius:10px;">
+      <button id="togglePassEye" type="button" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px;">👁️</button>
+    </div>
+    <button class="btn btn-gold" id="loginSubmitBtn" style="width:100%; justify-content:center; padding:12px; font-size:15px;">تسجيل الدخول ⚡</button>
+  </div>
+</div>
+
+<header>
+  <div class="brand">
+    <span class="brand-crown">👑</span>
+    <div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="brand-title">سرفر القيادة والتحكم | عبدالإله</span>
+        <span class="brand-badge">الإصدار الملكي V6</span>
+      </div>
+      <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">نظام الحظر الفوري وتتبع أجهزة الآيفون الدقيق</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <div class="time-badge" id="liveClock">--:--:--</div>
+    <div class="server-status-pill"><span class="pulse-dot"></span><span>السيرفر متصل بنشاط</span></div>
+    <button class="btn btn-danger btn-sm" id="btnPurgeAll">🚨 قفل وتصفير شامل على الجميع</button>
+    <button class="btn btn-secondary btn-sm" id="btnLogout">خروج</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-title"><span>إجمالي الأكواد</span><span class="stat-icon">🔑</span></div>
+      <div class="stat-value" id="statTotalKeys">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title"><span>الأكواد النشطة والمفعلة</span><span class="stat-icon">🟢</span></div>
+      <div class="stat-value" style="color: var(--accent-emerald);" id="statApproved">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title"><span>الأكواد المقفلة والمحظورة</span><span class="stat-icon">🛑</span></div>
+      <div class="stat-value" style="color: var(--accent-red);" id="statBlocked">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title"><span>أجهزة الآيفون المربوطة</span><span class="stat-icon">📱</span></div>
+      <div class="stat-value" style="color: #60a5fa;" id="statDevices">0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span>⚡</span><span>توليد كود تفعيل جديد</span></div>
+      <div style="font-size:12.5px; color:var(--text-muted);">الأكواد ترتبط بالسيرفر مباشرة وتقبل القفل والإلغاء بلحظة</div>
+    </div>
+    <div class="form-grid">
+      <div class="field-group">
+        <label class="field-label">👤 اسم العميل / صاحب الكود</label>
+        <input type="text" id="newOwnerName" placeholder="مثال: أحمد الشمري أو VIP فهد">
+      </div>
+      <div class="field-group">
+        <label class="field-label">⏱️ مدة الاشتراك</label>
+        <select id="newDuration">
+          <option value="1">24 ساعة (يوم تجريبي)</option>
+          <option value="3">3 أيام</option>
+          <option value="7">أسبوع كامل (7 أيام)</option>
+          <option value="30" selected>شهر كامل (30 يوم)</option>
+          <option value="60">شهرين (60 يوم)</option>
+          <option value="90">3 أشهر (90 يوم)</option>
+          <option value="365">سنة كاملة (365 يوم)</option>
+          <option value="3650">دائم مدى الحياة 👑</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">📱 الحد الأقصى للأجهزة</label>
+        <select id="newMaxDevices">
+          <option value="1" selected>جهاز آيفون واحد (1)</option>
+          <option value="2">جهازين (2)</option>
+          <option value="5">5 أجهزة</option>
+          <option value="16">16 جهاز (أسطول كامل)</option>
+        </select>
+      </div>
+      <button class="btn btn-gold" id="btnGenerate" style="height:44px; padding: 0 24px;">⚡ توليد الكود فوراً</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="filter-bar">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="card-title" style="margin:0;"><span>📋</span><span>إدارة وتتبع الأكواد وأجهزة الآيفون</span></div>
+        <span class="time-badge" id="filteredCountBadge">0 كود</span>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input type="text" id="searchInput" placeholder="🔍 بحث بكود، اسم العميل، موديل الآيفون..." style="min-width:280px;">
+        <button class="btn btn-secondary btn-sm" id="btnRefresh">🔄 تحديث البيانات</button>
+        <button class="btn btn-secondary btn-sm" id="btnDownloadBackup">💾 نسخة احتياطية</button>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>الكود الملكي</th>
+            <th>اسم العميل</th>
+            <th>الحالة والتحكم</th>
+            <th>معلومات جهاز الآيفون المتصل</th>
+            <th>الصلاحية</th>
+            <th>الإجراءات السريعة</th>
+          </tr>
+        </thead>
+        <tbody id="keysTableBody">
+          <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:40px;">جاري تحميل البيانات...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || '';
+  var urlParams = new URLSearchParams(window.location.search);
+  var urlPass = urlParams.get('pass') || urlParams.get('token');
+  if (urlPass) {
+    token = urlPass.trim();
+    sessionStorage.setItem('adminToken', token);
+    localStorage.setItem('adminToken', token);
+  }
+
+  var allKeys = [];
+
+  function updateClock() {
+    var now = new Date();
+    var str = now.toLocaleTimeString('ar-SA', { hour12: true });
+    document.getElementById('liveClock').innerText = str;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  function req(url, options) {
+    options = options || {};
+    options.headers = options.headers || {};
+    options.headers['Authorization'] = 'Bearer ' + token;
+    return fetch(url, options);
+  }
+
+  function loadData(cb) {
+    req('/api/admin/keys')
+    .then(function(res) {
+      if (!res.ok) throw new Error('Auth error');
+      return res.json();
+    })
+    .then(function(data) {
+      allKeys = data.keys || [];
+      document.getElementById('statTotalKeys').innerText = (data.stats && data.stats.total_keys) || 0;
+      document.getElementById('statApproved').innerText = (data.stats && data.stats.approved) || 0;
+      document.getElementById('statBlocked').innerText = (data.stats && data.stats.blocked) || 0;
+      document.getElementById('statDevices').innerText = (data.stats && data.stats.total_devices) || 0;
+      render();
+      if (cb) cb(true);
+    })
+    .catch(function() {
+      if (cb) cb(false);
+    });
+  }
+
+  function render() {
+    var tbody = document.getElementById('keysTableBody');
+    var q = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+    var list = allKeys.filter(function(k) {
+      if (!q) return true;
+      var inKey = (k.key && k.key.toLowerCase().indexOf(q) !== -1);
+      var inOwner = (k.owner && k.owner.toLowerCase().indexOf(q) !== -1);
+      var inDev = false;
+      if (k.devices && Array.isArray(k.devices)) {
+        inDev = k.devices.some(function(d) {
+          return (d.deviceName && d.deviceName.toLowerCase().indexOf(q) !== -1) ||
+                 (d.deviceModel && d.deviceModel.toLowerCase().indexOf(q) !== -1) ||
+                 (d.rawModel && d.rawModel.toLowerCase().indexOf(q) !== -1) ||
+                 (d.deviceId && d.deviceId.toLowerCase().indexOf(q) !== -1);
+        });
+      }
+      return inKey || inOwner || inDev;
+    });
+
+    document.getElementById('filteredCountBadge').innerText = list.length + ' كود';
+
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:45px; font-weight:700;">لا توجد أي أكواد مسجلة (النظام نظيف ومصفّر بالكامل ومغلق على الجميع ✅)</td></tr>';
+      return;
+    }
+
+    var h = '';
+    for (var i = 0; i < list.length; i++) {
+      var k = list[i];
+      var isBlock = (k.status === 'blocked' || k.active === false);
+      var expStr = 'دائم مدى الحياة 👑';
+      if (k.expiresAt) {
+        var expDate = new Date(k.expiresAt);
+        var diffDays = Math.ceil((expDate - new Date()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 0) expStr = '<span style="color:var(--accent-red)">منتهي الصلاحية ⌛</span>';
+        else expStr = 'متبقي ' + diffDays + ' يوم <br><small style="color:var(--text-muted)">' + expDate.toLocaleDateString('ar-SA') + '</small>';
+      }
+
+      var deviceCell = '';
+      if (!k.devices || k.devices.length === 0) {
+        deviceCell = '<span class="device-badge-empty">⏳ بانتظار الربط بأول آيفون...</span>';
+      } else {
+        deviceCell = k.devices.map(function(d) {
+          var modelName = d.deviceModel || 'iPhone';
+          var devName = d.deviceName || 'iPhone';
+          var iosVer = d.iosVersion ? ('iOS ' + d.iosVersion) : '';
+          var seen = d.lastSeen ? new Date(d.lastSeen).toLocaleTimeString('ar-SA', { hour12: true, hour: '2-digit', minute: '2-digit' }) : '-';
+          return '<div class="device-box">' +
+            '<div class="device-model-title">📱 ' + modelName + '</div>' +
+            '<div class="device-sub">' + devName + ' • ' + iosVer + '</div>' +
+            '<div style="font-size:10.5px; color:var(--text-muted); display:flex; justify-content:space-between; margin-top:2px;">' +
+              '<span>آخر ظهور: ' + seen + '</span>' +
+              '<span title="' + (d.deviceId || '') + '">معرف: ' + (d.deviceId ? d.deviceId.substring(0, 8) + '...' : '-') + '</span>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+
+      h += '<tr>' +
+        '<td><div class="key-badge"><span>' + k.key + '</span><button class="copy-btn" data-action="copy" data-key="' + k.key + '" title="نسخ الكود">📋</button></div></td>' +
+        '<td><div class="client-tag"><span>👤</span><span>' + (k.owner || 'عميل') + '</span><button class="copy-btn" data-action="edit-owner" data-key="' + k.key + '" data-owner="' + (k.owner || 'عميل') + '" title="تعديل اسم العميل">✏️</button></div></td>' +
+        '<td>' + (isBlock ? '<span class="status-badge blocked">🛑 مقفل ومحظور</span>' : '<span class="status-badge active">🟢 نشط ومصرح</span>') + '</td>' +
+        '<td>' + deviceCell + '</td>' +
+        '<td style="font-size:12.5px;">' + expStr + '</td>' +
+        '<td><div style="display:flex; gap:6px; flex-wrap:wrap;">' +
+          '<button class="btn ' + (isBlock ? 'btn-success' : 'btn-danger') + ' btn-sm" data-action="toggle" data-key="' + k.key + '">' + (isBlock ? '🔓 تفعيل' : '🔒 قفل') + '</button>' +
+          '<button class="btn btn-secondary btn-sm" data-action="reset" data-key="' + k.key + '" title="فك ارتباط الجهاز">🔄 فك ارتباط</button>' +
+          '<button class="btn btn-secondary btn-sm" data-action="share" data-key="' + k.key + '" data-owner="' + (k.owner || 'عميل') + '" title="مشاركة عبر واتساب">💬</button>' +
+          '<button class="btn btn-danger btn-sm" data-action="delete" data-key="' + k.key + '" title="حذف نهائي">🗑️</button>' +
+        '</div></td>' +
+      '</tr>';
+    }
+    tbody.innerHTML = h;
+  }
+
+  var tbodyEl = document.getElementById('keysTableBody');
+  tbodyEl.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var act = btn.getAttribute('data-action');
+    var key = btn.getAttribute('data-key');
+    var owner = btn.getAttribute('data-owner');
+
+    if (act === 'copy') {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(key).then(function() { alert('تم نسخ الكود بنجاح: ' + key); });
+      } else {
+        prompt('انسخ الكود:', key);
+      }
+    } else if (act === 'edit-owner') {
+      var newName = prompt('تعديل اسم العميل / صاحب الكود (' + key + '):', owner);
+      if (newName && newName.trim() !== '') {
+        req('/api/admin/edit_owner', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: key, owner: newName.trim() })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+          if (d.success) loadData();
+        });
+      }
+    } else if (act === 'toggle') {
+      req('/api/admin/toggle_lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success) loadData();
+      });
+    } else if (act === 'reset') {
+      if (confirm('هل تريد فك ارتباط جهاز الآيفون المسجل على الكود (' + key + ')؟ سيتمكن العميل من ربط جهاز جديد فوراً.')) {
+        req('/api/admin/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: key })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+          if (d.success) {
+            alert('تم فك الارتباط بنجاح ✅');
+            loadData();
+          }
+        });
+      }
+    } else if (act === 'share') {
+      var shareMsg = 'مرحباً ' + (owner || 'عميلنا العزيز') + ' 👋\nتم تفعيل اشتراكك في أداة يلا سنايبر الملكية 👑\nكود التفعيل الخاص بك:\n' + key + '\nنتمنى لك استخداماً موفقاً!';
+      window.open('https://wa.me/?text=' + encodeURIComponent(shareMsg), '_blank');
+    } else if (act === 'delete') {
+      if (confirm('تحذير: هل أنت متأكد من حذف الكود (' + key + ') نهائياً من السيرفر؟ سيتم حظر الجهاز المسجل فوراً.')) {
+        req('/api/admin/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: key })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+          if (d.success) loadData();
+        });
+      }
+    }
+  });
+
+  function doLogin() {
+    var p = (document.getElementById('adminPassInput').value || '').trim();
+    var err = document.getElementById('loginError');
+    var btn = document.getElementById('loginSubmitBtn');
+    err.style.display = 'none';
+
+    if (!p) {
+      err.innerText = 'يرجى إدخال كلمة المرور';
+      err.style.display = 'block';
+      return;
+    }
+
+    btn.innerText = 'جاري التحقق...';
+    btn.disabled = true;
+    token = p;
+    sessionStorage.setItem('adminToken', token);
+    localStorage.setItem('adminToken', token);
+
+    loadData(function(ok) {
+      btn.innerText = 'تسجيل الدخول ⚡';
+      btn.disabled = false;
+      if (ok) {
+        document.getElementById('loginModal').style.display = 'none';
+      } else {
+        sessionStorage.removeItem('adminToken');
+        localStorage.removeItem('adminToken');
+        token = '';
+        err.innerText = 'كلمة المرور غير صحيحة!';
+        err.style.display = 'block';
+      }
+    });
+  }
+
+  document.getElementById('loginSubmitBtn').addEventListener('click', doLogin);
+  document.getElementById('adminPassInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('btnRefresh').addEventListener('click', function() { loadData(); });
+  document.getElementById('searchInput').addEventListener('input', render);
+
+  var eyeBtn = document.getElementById('togglePassEye');
+  var passInp = document.getElementById('adminPassInput');
+  eyeBtn.addEventListener('click', function() {
+    if (passInp.type === 'password') {
+      passInp.type = 'text';
+      eyeBtn.innerText = '🙈';
+    } else {
+      passInp.type = 'password';
+      eyeBtn.innerText = '👁️';
+    }
+  });
+
+  document.getElementById('btnLogout').addEventListener('click', function() {
+    sessionStorage.removeItem('adminToken');
+    localStorage.removeItem('adminToken');
+    token = '';
+    document.getElementById('loginModal').style.display = 'flex';
+    document.getElementById('adminPassInput').value = '';
+  });
+
+  document.getElementById('btnGenerate').addEventListener('click', function() {
+    var owner = (document.getElementById('newOwnerName').value || '').trim();
+    var duration = document.getElementById('newDuration').value;
+    var maxDevices = document.getElementById('newMaxDevices').value;
+    var btn = document.getElementById('btnGenerate');
+    btn.disabled = true;
+    btn.innerText = 'جاري التوليد...';
+
+    req('/api/admin/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ owner: owner, durationDays: duration, maxDevices: maxDevices })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      btn.innerText = '⚡ توليد الكود فوراً';
+      if (d.success) {
+        document.getElementById('newOwnerName').value = '';
+        loadData();
+        prompt('✅ تم توليد كود التفعيل بنجاح! انسخ الكود وشاركه مع العميل:', d.key.key);
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.innerText = '⚡ توليد الكود فوراً';
+    });
+  });
+
+  document.getElementById('btnPurgeAll').addEventListener('click', function() {
+    var ans = prompt('🚨 تحذير أمني خطير جداً:\nهذا الإجراء سيقوم بحذف كافة الأكواد وحظر وقفل الأداة على جميع أجهزة المشتركين في العالم فوراً!\nاكتب (قفل الجميع) للمتابعة:');
+    if (ans === 'قفل الجميع' || ans === 'نعم') {
+      req('/api/admin/purge_all', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        alert(d.message || 'تم قفل وتصفير النظام على الجميع بنجاح ✅');
+        loadData();
+      });
+    }
+  });
+
+  document.getElementById('btnDownloadBackup').addEventListener('click', function() {
+    window.open('/api/admin/backup?token=' + encodeURIComponent(token), '_blank');
+  });
+
+  if (token) {
+    loadData(function(ok) {
+      if (ok) document.getElementById('loginModal').style.display = 'none';
+      else document.getElementById('loginModal').style.display = 'flex';
+    });
+  }
+})();
+</script>
+</body>
+</html>`;
+
+const adminRoutes = [
+  '/', '/' + ADMIN_PATH, '/admin', '/abod', '/login', '/dashboard', '/control'
+];
+adminRoutes.forEach(r => {
+  app.get(r, (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(DASHBOARD_HTML);
+  });
+});
+
+// صفحة 404 للمسارات المجهولة
+app.use((req, res) => {
+  res.status(404).json({ error: 'NOT_FOUND', message: 'The requested resource does not exist.' });
+});
+
+// نظام الحفاظ على استيقاظ السيرفر الذاتي (Keep-Alive Self Ping)
+const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || 'https://yalla-upd0.onrender.com/api/health';
+setInterval(() => {
+  try {
+    https.get(KEEP_ALIVE_URL, (res) => {}).on('error', () => {});
+  } catch (e) {}
+}, 7 * 60 * 1000);
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('🚀 YallaSniper Executive Licensing Server running securely on 0.0.0.0:' + PORT);
+});
