@@ -137,7 +137,7 @@ initMongoCloud();
 function buildLockedResponse(msg) {
   return {
     status: "blocked",
-    message: msg || "Key Expired or Invalid",
+    message: msg || "🚫 تم إيقاف وقفل الأداة من الإدارة نهائياً",
     valid: false,
     approved: false,
     active: false,
@@ -204,25 +204,25 @@ function handleValidate(req, res) {
   const { key, deviceId, deviceName, deviceModel, iosVersion, bundleId } = extractRequestParams(req);
 
   if (!key || !deviceId) {
-    return res.status(403).json(buildLockedResponse("Key Expired or Invalid"));
+    return res.json(buildLockedResponse("Key Expired or Invalid"));
   }
 
   const cleanKey = String(key).trim().toUpperCase();
 
   if (!cleanKey.startsWith('ABOD-')) {
-    return res.status(403).json(buildLockedResponse("Key Expired or Invalid"));
+    return res.json(buildLockedResponse("Key Expired or Invalid"));
   }
 
   const db = loadDB();
   const keyObj = (db.keys || []).find(k => k.key && k.key.trim().toUpperCase() === cleanKey);
 
   if (!keyObj) {
-    return res.status(403).json(buildLockedResponse("Key Expired or Invalid"));
+    return res.json(buildLockedResponse("Key Expired or Invalid"));
   }
 
   // إذا تم قفل الكود من الإدارة يدوياً
   if (keyObj.status === 'blocked') {
-    return res.status(403).json(buildLockedResponse("🚫 تم إيقاف وقفل هذا الكود نهائياً من الإدارة"));
+    return res.json(buildLockedResponse("🚫 تم إيقاف وقفل هذا الكود نهائياً من الإدارة"));
   }
 
   if (!keyObj.activations) {
@@ -233,7 +233,7 @@ function handleValidate(req, res) {
 
   if (thisDevice) {
     if (thisDevice.status === 'rejected' || thisDevice.status === 'blocked') {
-      return res.status(403).json(buildLockedResponse("🚫 تم قفل الأداة عن هذا الجهاز من قِبل الإدارة"));
+      return res.json(buildLockedResponse("🚫 تم قفل الأداة عن هذا الجهاز من قِبل الإدارة"));
     }
     
     if (thisDevice.status === 'approved') {
@@ -271,7 +271,7 @@ function handleValidate(req, res) {
   // ربط الكود بجهاز واحد فقط
   const approvedOnOtherDevice = keyObj.activations.find(a => a.status === 'approved' && a.device_id !== deviceId);
   if (approvedOnOtherDevice) {
-    return res.status(403).json(buildLockedResponse("⚠️ هذا الكود مفعّل لجهاز آخر بالفعل ولا يمكن استخدامه على هذا الجهاز!"));
+    return res.json(buildLockedResponse("⚠️ هذا الكود مفعّل لجهاز آخر بالفعل ولا يمكن استخدامه على هذا الجهاز!"));
   }
 
   const newActivation = {
@@ -292,10 +292,10 @@ function handleValidate(req, res) {
   return res.json({ 
     valid: true, 
     approved: true, 
-    active: true,
-    success: true,
-    allowed: true,
-    licensed: true,
+    active: true, 
+    success: true, 
+    allowed: true, 
+    licensed: true, 
     status: "approved",
     key: cleanKey, 
     owner_name: keyObj.owner_name || "",
@@ -310,7 +310,7 @@ function handleCheckDevice(req, res) {
   const { deviceId, deviceName, deviceModel, iosVersion } = extractRequestParams(req);
 
   if (!deviceId) {
-    return res.status(403).json(buildLockedResponse("Key Expired or Invalid"));
+    return res.json(buildLockedResponse("Key Expired or Invalid"));
   }
 
   const db = loadDB();
@@ -319,7 +319,7 @@ function handleCheckDevice(req, res) {
     const act = (k.activations || []).find(a => a.device_id === deviceId);
     if (act) {
       if (act.status === 'blocked' || act.status === 'rejected') {
-        return res.status(403).json(buildLockedResponse("🚫 تم قفل الأداة عن هذا الجهاز"));
+        return res.json(buildLockedResponse("🚫 تم قفل الأداة عن هذا الجهاز"));
       }
       if (act.status === 'approved') {
         act.last_seen = new Date().toISOString();
@@ -329,11 +329,11 @@ function handleCheckDevice(req, res) {
         saveDB(db);
         return res.json({ 
           valid: true, 
-          approved: true,
-          active: true,
-          success: true,
-          allowed: true,
-          licensed: true,
+          approved: true, 
+          active: true, 
+          success: true, 
+          allowed: true, 
+          licensed: true, 
           status: "approved",
           key: k.key, 
           owner_name: k.owner_name || "",
@@ -353,7 +353,7 @@ function handleCheckDevice(req, res) {
     }
   }
 
-  return res.status(403).json(buildLockedResponse("Key Expired or Invalid"));
+  return res.json(buildLockedResponse("Key Expired or Invalid"));
 }
 
 const validateRoutes = [
@@ -581,11 +581,11 @@ app.post('/api/admin/restore', requireAdminAuth, (req, res) => {
 });
 
 app.all('/api/*', (req, res) => {
-  res.status(403).json(buildLockedResponse("Key Expired or Invalid"));
+  res.json(buildLockedResponse("Key Expired or Invalid"));
 });
 
 app.post('*', (req, res) => {
-  res.status(403).json(buildLockedResponse("Key Expired or Invalid"));
+  res.json(buildLockedResponse("Key Expired or Invalid"));
 });
 
 app.get('/', (req, res) => {
@@ -718,71 +718,21 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     letter-spacing: -0.5px;
   }
   .brand-subtitle {
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--text-secondary);
-    font-weight: 600;
+    letter-spacing: 0.5px;
   }
-
-  /* Stats Cards */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 20px;
-    padding: 30px 40px 10px 40px;
-  }
-  .stat-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 22px;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.2s;
-  }
-  .stat-card:hover {
-    border-color: var(--border-gold);
-    transform: translateY(-2px);
-  }
-  .stat-card::before {
-    content: '';
-    position: absolute; top: 0; right: 0; width: 4px; height: 100%;
-    background: var(--gold);
-  }
-  .stat-card.danger::before { background: var(--danger); }
-  .stat-card.success::before { background: var(--success); }
-  .stat-val {
-    font-size: 32px;
-    font-weight: 900;
-    color: #fff;
-    margin-bottom: 4px;
-  }
-  .stat-lbl {
-    font-size: 13px;
-    color: var(--text-secondary);
-    font-weight: 600;
-  }
-
-  /* Toolbar */
-  .toolbar {
-    padding: 20px 40px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 15px;
-    flex-wrap: wrap;
-  }
-  .actions-group {
+  .header-actions {
     display: flex;
     gap: 12px;
-    flex-wrap: wrap;
   }
   .btn {
-    padding: 11px 20px;
-    border-radius: 12px;
-    border: none;
     font-family: inherit;
     font-size: 14px;
     font-weight: 700;
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: none;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -790,58 +740,117 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     transition: all 0.2s;
   }
   .btn-gold {
-    background: linear-gradient(135deg, #ffd700, #d4af37);
-    color: #08090d;
-    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.35);
+    background: linear-gradient(135deg, #ffd700, #d4af37, #aa8210);
+    color: #000;
+    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
   }
-  .btn-gold:hover { transform: translateY(-1px); filter: brightness(1.08); }
+  .btn-gold:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
+  }
   .btn-danger {
     background: var(--danger-bg);
     color: var(--danger);
     border: 1px solid rgba(255, 71, 87, 0.3);
   }
-  .btn-danger:hover { background: var(--danger); color: #fff; }
+  .btn-danger:hover {
+    background: var(--danger);
+    color: #fff;
+  }
   .btn-outline {
-    background: var(--bg-card);
-    color: var(--text-primary);
+    background: transparent;
+    color: var(--text-secondary);
     border: 1px solid var(--border);
   }
-  .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-outline:hover {
+    color: #fff;
+    border-color: var(--text-secondary);
+  }
+
+  /* Container & Stats */
+  .container {
+    max-width: 1300px;
+    margin: 30px auto;
+    padding: 0 25px;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 25px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0; width: 4px; height: 100%;
+    background: var(--border);
+  }
+  .stat-card.gold::after { background: var(--gold); }
+  .stat-card.green::after { background: var(--success); }
+  .stat-card.red::after { background: var(--danger); }
+  .stat-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 28px;
+    font-weight: 900;
+    color: #fff;
+  }
+
+  /* Table Controls */
+  .controls-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    gap: 15px;
+    flex-wrap: wrap;
+  }
   .search-box {
     position: relative;
-    width: 320px;
+    flex: 1;
+    max-width: 400px;
   }
   .search-box input {
     width: 100%;
     padding: 12px 18px 12px 40px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
     background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
     color: #fff;
     font-family: inherit;
     font-size: 14px;
-    transition: all 0.2s;
   }
   .search-box input:focus {
     outline: none;
-    border-color: var(--gold);
-    box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+    border-color: var(--border-gold);
   }
-  .search-box span {
-    position: absolute; left: 14px; top: 12px;
-    font-size: 16px; color: var(--text-muted);
+  .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
   }
 
   /* Table */
-  .table-wrap {
-    padding: 0 40px;
-  }
-  .table-box {
+  .table-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 18px;
+    border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
   }
   table {
     width: 100%;
@@ -851,304 +860,289 @@ app.get('/' + ADMIN_PATH, (req, res) => {
   th {
     background: #141724;
     padding: 16px 20px;
-    color: var(--gold);
-    font-size: 13.5px;
-    font-weight: 800;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary);
     border-bottom: 1px solid var(--border);
-    letter-spacing: 0.2px;
   }
   td {
     padding: 18px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     font-size: 14px;
+    border-bottom: 1px solid rgba(30, 34, 53, 0.6);
     vertical-align: middle;
   }
   tr:hover td {
     background: var(--bg-card-hover);
   }
-
-  /* Components */
-  .key-badge {
-    font-family: 'SF Mono', Menlo, monospace;
-    font-size: 15px;
+  .key-code {
+    font-family: 'Courier New', monospace;
     font-weight: 800;
-    color: #ffd700;
-    letter-spacing: 0.5px;
+    font-size: 15px;
+    color: var(--gold-glow);
+    background: rgba(212, 175, 55, 0.08);
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 175, 55, 0.25);
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: rgba(212, 175, 55, 0.1);
-    padding: 6px 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(212, 175, 55, 0.25);
+    letter-spacing: 0.5px;
   }
   .owner-tag {
-    font-size: 15px;
-    font-weight: 800;
-    color: #fff;
-    display: inline-flex;
+    font-weight: 700;
+    color: #ffffff;
+    display: flex;
     align-items: center;
     gap: 6px;
   }
   .owner-edit-btn {
-    background: none; border: none; cursor: pointer;
-    font-size: 14px; color: var(--text-secondary);
-    transition: color 0.15s;
+    background: none;
+    border: none;
+    color: var(--gold);
+    cursor: pointer;
+    font-size: 13px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
   }
-  .owner-edit-btn:hover { color: var(--gold); }
-  
-  .device-info-box {
+  .owner-edit-btn:hover { opacity: 1; }
+  .note-tag {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+  .device-info {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
-  .device-model-badge {
-    font-size: 13.5px;
-    font-weight: 800;
-    color: #00d26a;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  .device-friendly-name {
+    font-weight: 700;
+    color: #4cd137;
   }
-  .device-name-sub {
-    font-size: 12px;
-    color: var(--text-secondary);
-  }
-  .device-hwid {
-    font-family: monospace;
-    font-size: 11px;
+  .device-raw {
+    font-size: 11.5px;
     color: var(--text-muted);
+    font-family: monospace;
   }
-
-  .status-pill {
+  .badge {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 5px 12px;
-    border-radius: 20px;
+    border-radius: 8px;
     font-size: 12.5px;
-    font-weight: 800;
+    font-weight: 700;
   }
-  .status-pill.active {
-    background: var(--success-bg);
-    color: var(--success);
-    border: 1px solid rgba(0, 210, 106, 0.3);
-  }
-  .status-pill.blocked {
-    background: var(--danger-bg);
-    color: var(--danger);
-    border: 1px solid rgba(255, 71, 87, 0.3);
-  }
-  .status-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: currentColor;
-    box-shadow: 0 0 8px currentColor;
-  }
+  .badge-active { background: var(--success-bg); color: var(--success); }
+  .badge-blocked { background: var(--danger-bg); color: var(--danger); }
+  .badge-pending { background: var(--warning-bg); color: var(--warning); }
 
   .actions-cell {
     display: flex;
-    align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
+    align-items: center;
   }
   .act-btn {
     padding: 6px 12px;
     border-radius: 8px;
-    font-family: inherit;
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 700;
-    border: none;
     cursor: pointer;
+    border: 1px solid transparent;
+    font-family: inherit;
     transition: all 0.15s;
   }
   .act-btn-lock {
     background: rgba(255, 71, 87, 0.15);
     color: #ff4757;
-    border: 1px solid rgba(255, 71, 87, 0.3);
+    border-color: rgba(255, 71, 87, 0.3);
   }
   .act-btn-lock:hover { background: #ff4757; color: #fff; }
   .act-btn-unlock {
     background: rgba(0, 210, 106, 0.15);
     color: #00d26a;
-    border: 1px solid rgba(0, 210, 106, 0.3);
+    border-color: rgba(0, 210, 106, 0.3);
   }
   .act-btn-unlock:hover { background: #00d26a; color: #000; }
   .act-btn-reset {
-    background: #25283a;
-    color: #d1d5db;
-    border: 1px solid #363a52;
+    background: #1e2235;
+    color: var(--text-secondary);
   }
-  .act-btn-reset:hover { border-color: var(--gold); color: var(--gold); }
+  .act-btn-reset:hover { color: #fff; background: #282e47; }
   .act-btn-delete {
-    background: none;
+    background: transparent;
     color: var(--text-muted);
-    border: 1px solid transparent;
   }
-  .act-btn-delete:hover { color: #ff4757; border-color: rgba(255, 71, 87, 0.3); }
+  .act-btn-delete:hover { color: var(--danger); }
 
-  /* Modal */
-  .modal-overlay {
+  /* Modals */
+  .modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(8px);
+    background: rgba(0,0,0,0.8);
     display: none; justify-content: center; align-items: center;
-    z-index: 10000;
+    z-index: 1000;
   }
   .modal-content {
     background: var(--bg-card);
     border: 1px solid var(--border-gold);
-    border-radius: 20px;
-    width: 440px;
-    max-width: 90%;
+    border-radius: 18px;
     padding: 30px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.9);
+    width: 440px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.7);
   }
-  .modal-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 20px;
-  }
-  .modal-header h3 {
-    font-size: 19px;
+  .modal-title {
     color: var(--gold);
+    font-size: 20px;
     font-weight: 800;
+    margin-bottom: 18px;
   }
-  .modal-close {
-    background: none; border: none; color: var(--text-secondary);
-    font-size: 20px; cursor: pointer;
-  }
-  .modal-body label {
-    display: block; font-size: 13px; font-weight: 700;
-    color: var(--text-secondary); margin-bottom: 8px;
-  }
-  .modal-body input {
-    width: 100%; padding: 12px; border-radius: 10px;
-    border: 1px solid var(--border); background: #161926;
-    color: #fff; font-family: inherit; font-size: 14px;
+  .form-group {
     margin-bottom: 16px;
+    text-align: right;
   }
-  .modal-body input:focus { outline: none; border-color: var(--gold); }
-  .modal-footer {
-    display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .form-group input, .form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #181a26;
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+  }
+  .form-group input:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: var(--gold);
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
   }
 </style>
 </head>
 <body>
 
-<!-- تسجيل الدخول -->
 <div id="loginOverlay">
   <div class="login-card">
-    <h2>👑 لوحة تحكم عبدالإله</h2>
-    <p>بوابة التحكم والأمان الرسمية (V4 Master)</p>
-    <input type="password" id="adminPassInput" placeholder="أدخل كلمة المرور" autofocus onkeydown="if(event.key==='Enter')doLogin()">
-    <button onclick="doLogin()">تسجيل الدخول</button>
+    <h2>👑 عبدالإله</h2>
+    <p>لوحة التحكم الملكية والتحكم بالأجهزة</p>
+    <input type="password" id="adminPasswordInput" placeholder="أدخل كلمة المرور..." onkeydown="if(event.key==='Enter') login()">
+    <button onclick="login()">دخول آمن</button>
   </div>
 </div>
 
-<!-- الترويسة الرئيسية -->
-<div class="header">
+<header class="header">
   <div class="brand">
-    <div class="brand-title">👑 لوحة تحكم عبدالإله</div>
-    <div class="brand-subtitle">نظام الإدارة والتحكم بالأكواد وإيقاف النسخ (V4 Edition)</div>
+    <span class="brand-title">👑 عبدالإله — الإدارة والتحكم</span>
+    <span class="brand-subtitle">نظام تفعيل الأكواد وقفل الأجهزة الصارم V4 Royal Edition</span>
   </div>
-  <div>
-    <button class="btn btn-danger" onclick="purgeAllCodes()">🚨 إيقاف وتصفير شامل لكافة الأكواد</button>
+  <div class="header-actions">
+    <button class="btn btn-gold" onclick="openGenerateModal()">➕ توليد كود جديد</button>
+    <button class="btn btn-outline" onclick="exportBackup()">💾 نسخ احتياطي</button>
+    <button class="btn btn-outline" onclick="document.getElementById('restoreInput').click()">📥 استعادة</button>
+    <input type="file" id="restoreInput" style="display:none" onchange="importBackup(event)" accept=".json">
+    <button class="btn btn-danger" onclick="purgeAllPrompt()">🚨 تصفير وقفل شامل للجميع</button>
   </div>
-</div>
+</header>
 
-<!-- بطاقات الإحصائيات -->
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="stat-val" id="statTotalKeys">0</div>
-    <div class="stat-lbl">🔑 إجمالي الأكواد</div>
+<div class="container">
+  <div class="stats-grid">
+    <div class="stat-card gold">
+      <div class="stat-label">إجمالي الأكواد المسجلة</div>
+      <div class="stat-value" id="statTotalKeys">0</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">الأجهزة المفعلة والشغالة</div>
+      <div class="stat-value" id="statApprovedDevices">0</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">الأكواد المقفلة (Kill-Switch)</div>
+      <div class="stat-value" id="statBlockedCount">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">حالة قاعدة البيانات السحابية</div>
+      <div class="stat-value" id="statCloudStatus" style="font-size:20px; margin-top:5px;">متصل ✅</div>
+    </div>
   </div>
-  <div class="stat-card success">
-    <div class="stat-val" id="statApprovedDevices">0</div>
-    <div class="stat-lbl">📱 الأجهزة المفعلة</div>
-  </div>
-  <div class="stat-card danger">
-    <div class="stat-val" id="statBlockedCount">0</div>
-    <div class="stat-lbl">🚫 الأكواد المقفلة</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-val" id="statCloudStatus" style="font-size:22px; color:var(--gold);">سحابي ✅</div>
-    <div class="stat-lbl">☁️ التخزين الدائم (MongoDB Atlas)</div>
-  </div>
-</div>
 
-<!-- شريط الإجراءات والبحث -->
-<div class="toolbar">
-  <div class="actions-group">
-    <button class="btn btn-gold" onclick="openGenerateModal()">➕ توليد كود جديد مع اسم الشخص</button>
-    <button class="btn btn-outline" onclick="exportBackup()">📥 تصدير نسخة احتياطية</button>
-    <button class="btn btn-outline" onclick="triggerRestore()">📤 استعادة نسخة احتياطية</button>
-    <input type="file" id="restoreFileInput" style="display:none" onchange="handleRestoreFile(this)">
+  <div class="controls-bar">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search" placeholder="ابحث بكود التفعيل، اسم المشتري، موديل الجهاز..." oninput="filterRows()">
+    </div>
+    <div style="font-size:13px; color:var(--text-secondary);">
+      تحديث حي تلقائي كل 10 ثوانٍ
+    </div>
   </div>
-  <div class="search-box">
-    <span>🔍</span>
-    <input type="text" id="search" placeholder="ابحث باسم الشخص، الكود، نوع الجهاز..." oninput="filterRows()">
-  </div>
-</div>
 
-<!-- جدول الأكواد والمشتركين -->
-<div class="table-wrap">
-  <div class="table-box">
+  <div class="table-card">
     <table>
       <thead>
         <tr>
-          <th>الكود (ABOD-)</th>
+          <th>كود التفعيل (ABOD)</th>
           <th>صاحب الكود (الاسم)</th>
-          <th>الجهاز الفعلي المفعّل</th>
-          <th>حالة الأداة</th>
-          <th>آخر ظهور</th>
-          <th>إجراءات التحكم السريع</th>
+          <th>الجهاز الفعلي المربوط</th>
+          <th>الحالة التشغيلية</th>
+          <th>آخر تواجد / فحص</th>
+          <th>الإجراءات الفورية</th>
         </tr>
       </thead>
       <tbody id="keysTableBody">
-        <tr><td colspan="6" style="text-align:center; padding: 40px; color: var(--text-secondary);">جاري تحميل الأكواد...</td></tr>
+        <tr>
+          <td colspan="6" style="text-align:center; padding: 40px; color: var(--text-secondary);">
+            جاري جلب البيانات...
+          </td>
+        </tr>
       </tbody>
     </table>
   </div>
 </div>
 
 <!-- مودال توليد كود جديد -->
-<div class="modal-overlay" id="generateModal">
+<div class="modal" id="generateModal">
   <div class="modal-content">
-    <div class="modal-header">
-      <h3>➕ توليد أكواد جديدة</h3>
-      <button class="modal-close" onclick="closeGenerateModal()">✕</button>
+    <div class="modal-title">✨ توليد كود تفعيل جديد</div>
+    <div class="form-group">
+      <label>اسم صاحب الكود (المشتري):</label>
+      <input type="text" id="genOwner" placeholder="مثال: فهد الشمري / ابومحمد...">
     </div>
-    <div class="modal-body">
-      <label>عدد الأكواد المطلوبة:</label>
+    <div class="form-group">
+      <label>عدد الأكواد المراد توليدها:</label>
       <input type="number" id="genCount" value="1" min="1" max="50">
-      
-      <label>اسم صاحب الكود (العميل):</label>
-      <input type="text" id="genOwner" placeholder="مثال: فهد المطيري / أبوعبدالله">
-
-      <label>ملاحظات إضافية (اختياري):</label>
-      <input type="text" id="genNote" placeholder="مثال: اشتراك شهر / رقم جوال">
     </div>
-    <div class="modal-footer">
+    <div class="form-group">
+      <label>ملاحظة اختيارية:</label>
+      <input type="text" id="genNote" placeholder="ملاحظة خاصة بالعميل...">
+    </div>
+    <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeGenerateModal()">إلغاء</button>
-      <button class="btn btn-gold" onclick="submitGenerate()">توليد وتفعيل الكود</button>
+      <button class="btn btn-gold" onclick="submitGenerate()">توليد الكود فوراً</button>
     </div>
   </div>
 </div>
 
-<!-- مودال تعديل اسم صاحب الكود -->
-<div class="modal-overlay" id="editOwnerModal">
+<!-- مودال تعديل اسم الشخص -->
+<div class="modal" id="editOwnerModal">
   <div class="modal-content">
-    <div class="modal-header">
-      <h3>✏️ تعديل اسم صاحب الكود</h3>
-      <button class="modal-close" onclick="closeEditOwnerModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="editTargetKey">
-      <label>اسم الشخص (العميل):</label>
+    <div class="modal-title">✏️ تعديل بيانات صاحب الكود</div>
+    <input type="hidden" id="editTargetKey">
+    <div class="form-group">
+      <label>اسم صاحب الكود:</label>
       <input type="text" id="editOwnerName">
-      <label>ملاحظة:</label>
+    </div>
+    <div class="form-group">
+      <label>الملاحظة:</label>
       <input type="text" id="editOwnerNote">
     </div>
-    <div class="modal-footer">
+    <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeEditOwnerModal()">إلغاء</button>
       <button class="btn btn-gold" onclick="submitEditOwner()">حفظ التعديل</button>
     </div>
@@ -1156,64 +1150,59 @@ app.get('/' + ADMIN_PATH, (req, res) => {
 </div>
 
 <script>
-let authToken = sessionStorage.getItem('abod_v4_admin_token') || "";
+let authToken = sessionStorage.getItem('abod_v4_admin_token') || '';
 let allKeys = [];
 
-// قاموس الترجمة الذكية لموديلات أجهزة أبل الفعلية
 const IPHONE_NAMES = {
-  "iPhone17,4": "iPhone 16 Plus",
-  "iPhone17,3": "iPhone 16",
-  "iPhone17,2": "iPhone 16 Pro Max",
-  "iPhone17,1": "iPhone 16 Pro",
-  "iPhone16,2": "iPhone 15 Pro Max",
-  "iPhone16,1": "iPhone 15 Pro",
-  "iPhone15,5": "iPhone 15 Plus",
-  "iPhone15,4": "iPhone 15",
-  "iPhone15,3": "iPhone 14 Pro Max",
-  "iPhone15,2": "iPhone 14 Pro",
-  "iPhone14,8": "iPhone 14 Plus",
-  "iPhone14,7": "iPhone 14",
-  "iPhone14,6": "iPhone SE (3rd gen)",
-  "iPhone14,3": "iPhone 13 Pro Max",
-  "iPhone14,2": "iPhone 13 Pro",
-  "iPhone14,5": "iPhone 13",
-  "iPhone14,4": "iPhone 13 mini",
-  "iPhone13,4": "iPhone 12 Pro Max",
-  "iPhone13,3": "iPhone 12 Pro",
-  "iPhone13,2": "iPhone 12",
-  "iPhone13,1": "iPhone 12 mini",
-  "iPhone12,8": "iPhone SE (2nd gen)",
-  "iPhone12,5": "iPhone 11 Pro Max",
-  "iPhone12,3": "iPhone 11 Pro",
-  "iPhone12,1": "iPhone 11",
-  "iPhone11,6": "iPhone XS Max",
-  "iPhone11,4": "iPhone XS Max",
-  "iPhone11,2": "iPhone XS",
-  "iPhone11,8": "iPhone XR",
-  "iPhone10,6": "iPhone X",
-  "iPhone10,3": "iPhone X",
-  "iPhone10,5": "iPhone 8 Plus",
-  "iPhone10,2": "iPhone 8 Plus",
-  "iPhone10,4": "iPhone 8",
-  "iPhone10,1": "iPhone 8"
+  'iPhone14,2': 'iPhone 13 Pro',
+  'iPhone14,3': 'iPhone 13 Pro Max',
+  'iPhone14,4': 'iPhone 13 mini',
+  'iPhone14,5': 'iPhone 13',
+  'iPhone14,6': 'iPhone SE (3rd gen)',
+  'iPhone14,7': 'iPhone 14',
+  'iPhone14,8': 'iPhone 14 Plus',
+  'iPhone15,2': 'iPhone 14 Pro',
+  'iPhone15,3': 'iPhone 14 Pro Max',
+  'iPhone15,4': 'iPhone 15',
+  'iPhone15,5': 'iPhone 15 Plus',
+  'iPhone16,1': 'iPhone 15 Pro',
+  'iPhone16,2': 'iPhone 15 Pro Max',
+  'iPhone17,1': 'iPhone 16 Pro',
+  'iPhone17,2': 'iPhone 16 Pro Max',
+  'iPhone17,3': 'iPhone 16',
+  'iPhone17,4': 'iPhone 16 Plus',
+  'iPhone13,1': 'iPhone 12 mini',
+  'iPhone13,2': 'iPhone 12',
+  'iPhone13,3': 'iPhone 12 Pro',
+  'iPhone13,4': 'iPhone 12 Pro Max',
+  'iPhone12,1': 'iPhone 11',
+  'iPhone12,3': 'iPhone 11 Pro',
+  'iPhone12,5': 'iPhone 11 Pro Max',
+  'iPhone11,8': 'iPhone XR',
+  'iPhone11,2': 'iPhone XS',
+  'iPhone11,6': 'iPhone XS Max',
+  'iPhone10,3': 'iPhone X',
+  'iPhone10,6': 'iPhone X'
 };
 
-function formatDeviceModel(model) {
-  if (!model) return "آيفون (غير معروف)";
-  return IPHONE_NAMES[model] || model;
+function formatDeviceModel(raw) {
+  if (!raw) return 'آيفون غير معروف';
+  return IPHONE_NAMES[raw] || raw;
 }
 
-if (authToken) {
-  testToken(authToken);
-}
+window.addEventListener('DOMContentLoaded', () => {
+  if (authToken) {
+    document.getElementById('loginOverlay').style.display = 'none';
+    loadData();
+    setInterval(loadData, 10000);
+  } else {
+    document.getElementById('loginOverlay').style.display = 'flex';
+  }
+});
 
-function doLogin() {
-  const p = document.getElementById('adminPassInput').value.trim();
-  if (!p) return;
-  testToken(p);
-}
-
-async function testToken(token) {
+async function login() {
+  const token = document.getElementById('adminPasswordInput').value.trim();
+  if (!token) return;
   try {
     const res = await fetch('/api/admin/keys', {
       headers: { 'Authorization': 'Bearer ' + token }
@@ -1269,62 +1258,62 @@ function renderTable(keys) {
     } else {
       deviceCellHtml = acts.map(a => {
         const friendlyModel = formatDeviceModel(a.device_model);
-        const devName = a.device_name || "آيفون";
-        const iosVer = a.ios_version ? ('iOS ' + a.ios_version) : '';
-        return \`<div class="device-info-box">
-          <div class="device-model-badge">📱 \${friendlyModel} <small style="color:var(--text-muted); font-size:11px;">(\${a.device_model || ''})</small></div>
-          <div class="device-name-sub">\${devName} \${iosVer ? '• ' + iosVer : ''}</div>
-          <div class="device-hwid" title="\${a.device_id}">\${a.device_id.substring(0, 18)}...</div>
-        </div>\`;
-      }).join('<hr style="border:none; border-top:1px solid #1e2235; margin:6px 0;">');
+        const devName = a.device_name || 'iPhone';
+        return `
+          <div class="device-info">
+            <span class="device-friendly-name">📱 ${friendlyModel}</span>
+            <span class="device-raw">${devName} (${a.device_model || ''})</span>
+            <span class="device-raw" style="font-size:10.5px; opacity:0.6;">UDID: ${a.device_id.substring(0, 14)}...</span>
+          </div>
+        `;
+      }).join('<hr style="border:0; border-top:1px dashed var(--border); margin:6px 0;">');
     }
 
-    // اسم الشخص (صاحب الكود)
-    const ownerName = k.owner_name || "غير محدد";
-    const noteBadge = k.note ? \`<div style="font-size:11px; color:var(--text-muted);">\${k.note}</div>\` : '';
-
-    // حالة الكود والأداة
-    const statusHtml = isKeyBlocked ?
-      '<span class="status-pill blocked"><span class="status-dot"></span> مقفل نهائياً</span>' :
-      '<span class="status-pill active"><span class="status-dot"></span> نشط ومفعل</span>';
-
-    // تاريخ آخر ظهور
-    let lastSeenStr = '-';
-    if (acts.length > 0 && acts[0].last_seen) {
-      lastSeenStr = new Date(acts[0].last_seen).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    let statusHtml = '';
+    if (isKeyBlocked) {
+      statusHtml = '<span class="badge badge-blocked">🔒 مقفل من الإدارة</span>';
+    } else if (acts.some(a => a.status === 'approved')) {
+      statusHtml = '<span class="badge badge-active">🟢 مفعل وشغال</span>';
+    } else {
+      statusHtml = '<span class="badge badge-pending">⏳ بانتظار أول تفعيل</span>';
     }
 
-    return \`<tr>
+    const lastSeen = acts[0] ? acts[0].last_seen : k.created_at;
+    const lastSeenStr = lastSeen ? new Date(lastSeen).toLocaleString('ar-SA') : 'غير متوفر';
+    const ownerName = k.owner_name || 'غير مسجل';
+    const noteBadge = k.note ? `<div class="note-tag">📝 ${k.note}</div>` : '';
+
+    return `<tr>
       <td>
-        <div class="key-badge">
-          \${k.key}
-          <button onclick="copyText('\${k.key}')" style="background:none; border:none; cursor:pointer; font-size:13px;" title="نسخ الكود">📋</button>
+        <div class="key-code">
+          ${k.key}
+          <button onclick="copyText('${k.key}')" style="background:none; border:none; cursor:pointer; font-size:13px;" title="نسخ الكود">📋</button>
         </div>
       </td>
       <td>
         <div class="owner-tag">
-          👤 \${ownerName}
-          <button class="owner-edit-btn" onclick="openEditOwnerModal('\${k.key}', '\${encodeURIComponent(ownerName)}', '\${encodeURIComponent(k.note || '')}')" title="تعديل اسم الشخص">✏️</button>
+          👤 ${ownerName}
+          <button class="owner-edit-btn" onclick="openEditOwnerModal('${k.key}', '${encodeURIComponent(ownerName)}', '${encodeURIComponent(k.note || '')}')" title="تعديل اسم الشخص">✏️</button>
         </div>
-        \${noteBadge}
+        ${noteBadge}
       </td>
-      <td>\${deviceCellHtml}</td>
-      <td>\${statusHtml}</td>
-      <td style="color:var(--text-secondary); font-size:12.5px;">\${lastSeenStr}</td>
+      <td>${deviceCellHtml}</td>
+      <td>${statusHtml}</td>
+      <td style="color:var(--text-secondary); font-size:12.5px;">${lastSeenStr}</td>
       <td>
         <div class="actions-cell">
-          <button class="act-btn \${isKeyBlocked ? 'act-btn-unlock' : 'act-btn-lock'}" onclick="toggleKeyLock('\${k.key}')">
-            \${isKeyBlocked ? '🔓 تفعيل الأداة' : '🔒 قفل الأداة'}
+          <button class="act-btn ${isKeyBlocked ? 'act-btn-unlock' : 'act-btn-lock'}" onclick="toggleKeyLock('${k.key}')">
+            ${isKeyBlocked ? '🔓 تفعيل الأداة' : '🔒 قفل الأداة'}
           </button>
-          <button class="act-btn act-btn-reset" onclick="resetKeyHWID('\${k.key}')" title="فك ارتباط الجهاز الحالي ليعمل على جهاز جديد">
+          <button class="act-btn act-btn-reset" onclick="resetKeyHWID('${k.key}')" title="فك ارتباط الجهاز الحالي ليعمل على جهاز جديد">
             🔄 فك الارتباط
           </button>
-          <button class="act-btn act-btn-delete" onclick="deleteKeyPermanent('\${k.key}')" title="حذف نهائي">
+          <button class="act-btn act-btn-delete" onclick="deleteKeyPermanent('${k.key}')" title="حذف نهائي">
             🗑️
           </button>
         </div>
       </td>
-    </tr>\`;
+    </tr>`;
   }).join('');
 }
 
@@ -1419,41 +1408,42 @@ async function deleteKeyPermanent(key) {
     body: JSON.stringify({ key })
   });
   const data = await res.json();
-  alert(data.message);
   loadData();
 }
 
-// تصفير شامل
-async function purgeAllCodes() {
-  if (!confirm('🚨 تحذير شديد الخطورة:\nهل تريد قفل وإلغاء جميع الأكواد وتصفير قاعدة البيانات بالكامل؟\nستتوقف الأداة عند جميع المشتركين بدون استثناء!')) return;
+// تصفير شامل وقفل الجميع
+async function purgeAllPrompt() {
+  const pass = prompt('🚨 تحذير شديد: سيتم قفل وإلغاء صلاحية جميع النسخ والأجهزة فوراً! أكتب كلمة المرور للتأكيد:');
+  if (pass !== 'abod2026') {
+    if (pass !== null) alert('كلمة المرور غير صحيحة!');
+    return;
+  }
   const res = await fetch('/api/admin/purge_all', {
     method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + authToken }
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }
   });
   const data = await res.json();
   alert(data.message);
   loadData();
 }
 
-function copyText(t) {
-  navigator.clipboard.writeText(t).then(() => alert('تم نسخ الكود: ' + t));
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    alert('تم نسخ الكود: ' + text);
+  });
 }
 
 function exportBackup() {
-  window.location.href = '/api/admin/backup?token=' + encodeURIComponent(authToken);
+  window.open('/api/admin/backup?token=' + encodeURIComponent(authToken), '_blank');
 }
 
-function triggerRestore() {
-  document.getElementById('restoreFileInput').click();
-}
-
-function handleRestoreFile(input) {
-  const file = input.files[0];
+function importBackup(e) {
+  const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = async function(e) {
+  reader.onload = async (event) => {
     try {
-      const json = JSON.parse(e.target.result);
+      const json = JSON.parse(event.target.result);
       const res = await fetch('/api/admin/restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
@@ -1494,7 +1484,7 @@ function filterRows() {
 </html>`);
 });
 
-// صفحة 404 للمسارات غير المعروفة (Stealth Mode)
+// صفحة 404 للمسارات العادية غير المعروفة (Stealth Mode)
 app.use((req, res) => {
   res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;"><h1>404 Not Found</h1><p>The requested URL ' + req.originalUrl + ' was not found on this server.</p><hr><address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server</address></body></html>');
 });
@@ -1504,7 +1494,7 @@ setInterval(() => {
   try {
     https.get(KEEP_ALIVE_URL, (res) => {}).on('error', () => {});
   } catch (e) {}
-}, 7 * 60 * 1000);
+}, 3.5 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
