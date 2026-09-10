@@ -260,8 +260,8 @@ function handleValidate(req, res) {
     return res.json({ 
       valid: false, 
       approved: false, 
-      active: false,
-      success: false,
+      active: false, 
+      success: false, 
       needs_approval: true, 
       needsApproval: true, 
       status: "pending", 
@@ -297,7 +297,7 @@ function handleValidate(req, res) {
     success: true, 
     allowed: true, 
     licensed: true, 
-    status: "approved",
+    status: "approved", 
     key: cleanKey, 
     owner_name: keyObj.owner_name || "",
     message: "👑 تم تفعيل وحفظ جهازك بنجاح!" 
@@ -335,7 +335,7 @@ function handleCheckDevice(req, res) {
           success: true, 
           allowed: true, 
           licensed: true, 
-          status: "approved",
+          status: "approved", 
           key: k.key, 
           owner_name: k.owner_name || "",
           message: "👑 تم تفعيل النسخة المكررة تلقائياً بنجاح!" 
@@ -581,50 +581,36 @@ app.post('/api/admin/restore', requireAdminAuth, (req, res) => {
   res.json({ success: true, message: 'تم استعادة ودمج ' + added + ' كود بنجاح!' });
 });
 
-app.all('/api/*', (req, res) => {
-  res.json(buildLockedResponse("Key Expired or Invalid"));
-});
-
-app.post('*', (req, res) => {
-  res.json(buildLockedResponse("Key Expired or Invalid"));
-});
-
-app.get('/', (req, res) => {
-  res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;"><h1>404 Not Found</h1><p>The requested URL / was not found on this server.</p><hr><address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server</address></body></html>');
-});
-
 // -------------------------------------------------------------
-// 👑 صفحة لوحة التحكم الفاخرة — عبدالإله V4 Royal Edition
+// 👑 صفحة لوحة التحكم الفاخرة — عبدالإله V4
 // -------------------------------------------------------------
-app.get('/' + ADMIN_PATH, (req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(`<!DOCTYPE html>
+const DASHBOARD_PAGE_HTML = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>👑 لوحة تحكم عبدالإله</title>
+<title>عبدالإله 👑 — لوحة التحكم المركزية</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg-main: #08090d;
-    --bg-card: #10121a;
-    --bg-card-hover: #151824;
-    --border: #1e2235;
-    --border-gold: rgba(212, 175, 55, 0.3);
-    --gold: #d4af37;
-    --gold-glow: #ffd700;
-    --gold-dark: #aa8210;
-    --text-primary: #ffffff;
-    --text-secondary: #9499b3;
-    --text-muted: #5d637f;
-    --danger: #ff4757;
-    --danger-bg: rgba(255, 71, 87, 0.12);
-    --success: #00d26a;
-    --success-bg: rgba(0, 210, 106, 0.12);
-    --warning: #ffa502;
-    --warning-bg: rgba(255, 165, 2, 0.12);
-    --info: #2ed573;
+    --bg-main: #0b0f19;
+    --bg-card: #111827;
+    --bg-card-hover: #172033;
+    --border: #1f293d;
+    --border-accent: #374151;
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
+    --accent-glow: rgba(99, 102, 241, 0.25);
+    --gold: #f59e0b;
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    --danger: #ef4444;
+    --danger-bg: rgba(239, 68, 68, 0.12);
+    --success: #10b981;
+    --success-bg: rgba(16, 185, 129, 0.12);
+    --warning: #f59e0b;
+    --warning-bg: rgba(245, 158, 11, 0.12);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -633,28 +619,32 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     color: var(--text-primary);
     min-height: 100vh;
     padding-bottom: 60px;
-    background-image: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.08) 0%, transparent 50%);
+    background-image: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.06) 0%, transparent 60%);
   }
+
+  /* Login Overlay */
   #loginOverlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(8, 9, 13, 0.98);
+    background: rgba(11, 15, 25, 0.98);
     display: flex; justify-content: center; align-items: center;
     z-index: 99999;
   }
   .login-card {
     background: var(--bg-card);
-    border: 1px solid var(--border-gold);
+    border: 1px solid var(--border-accent);
     border-radius: 20px;
     padding: 40px 35px;
     width: 380px;
     text-align: center;
-    box-shadow: 0 15px 50px rgba(0,0,0,0.8), 0 0 30px rgba(212, 175, 55, 0.1);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(99, 102, 241, 0.1);
   }
   .login-card h2 {
-    color: var(--gold);
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 900;
     margin-bottom: 8px;
+    background: linear-gradient(135deg, #ffffff 40%, var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
   .login-card p {
     font-size: 13px;
@@ -666,7 +656,7 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     padding: 14px;
     border-radius: 12px;
     border: 1px solid var(--border);
-    background: #181a26;
+    background: #0b0f19;
     color: #fff;
     font-family: inherit;
     font-size: 16px;
@@ -676,29 +666,32 @@ app.get('/' + ADMIN_PATH, (req, res) => {
   }
   .login-card input:focus {
     outline: none;
-    border-color: var(--gold);
-    box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
   }
   .login-card button {
     width: 100%;
     padding: 13px;
-    background: linear-gradient(135deg, #ffd700, #d4af37, #aa8210);
-    color: #000;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: #fff;
     border: none;
     border-radius: 12px;
     font-size: 16px;
     font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
-    transition: transform 0.15s;
+    box-shadow: 0 4px 15px var(--accent-glow);
+    transition: transform 0.15s, background 0.2s;
   }
-  .login-card button:hover { transform: translateY(-2px); }
+  .login-card button:hover {
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, #4f46e5, #4338ca);
+  }
 
   /* Header */
   .header {
-    background: rgba(16, 18, 26, 0.85);
+    background: rgba(17, 24, 39, 0.85);
     backdrop-filter: blur(15px);
-    border-bottom: 1px solid var(--border-gold);
+    border-bottom: 1px solid var(--border);
     padding: 20px 40px;
     display: flex;
     justify-content: space-between;
@@ -711,17 +704,17 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     gap: 3px;
   }
   .brand-title {
-    font-size: 24px;
+    font-size: 26px;
     font-weight: 900;
-    background: linear-gradient(135deg, #ffffff, #ffd700, #d4af37);
+    background: linear-gradient(135deg, #ffffff 40%, var(--gold));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.5px;
   }
   .brand-subtitle {
-    font-size: 12px;
+    font-size: 12.5px;
     color: var(--text-secondary);
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
   }
   .header-actions {
     display: flex;
@@ -740,19 +733,19 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     gap: 8px;
     transition: all 0.2s;
   }
-  .btn-gold {
-    background: linear-gradient(135deg, #ffd700, #d4af37, #aa8210);
-    color: #000;
-    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+  .btn-primary {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: #fff;
+    box-shadow: 0 4px 15px var(--accent-glow);
   }
-  .btn-gold:hover {
+  .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
   }
   .btn-danger {
     background: var(--danger-bg);
     color: var(--danger);
-    border: 1px solid rgba(255, 71, 87, 0.3);
+    border: 1px solid rgba(239, 68, 68, 0.3);
   }
   .btn-danger:hover {
     background: var(--danger);
@@ -761,11 +754,11 @@ app.get('/' + ADMIN_PATH, (req, res) => {
   .btn-outline {
     background: transparent;
     color: var(--text-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-accent);
   }
   .btn-outline:hover {
     color: #fff;
-    border-color: var(--text-secondary);
+    border-color: var(--text-primary);
   }
 
   /* Container & Stats */
@@ -787,15 +780,14 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     padding: 22px 25px;
     position: relative;
     overflow: hidden;
-    transition: border-color 0.2s;
   }
   .stat-card::after {
     content: '';
     position: absolute;
     top: 0; right: 0; width: 4px; height: 100%;
-    background: var(--border);
+    background: var(--border-accent);
   }
-  .stat-card.gold::after { background: var(--gold); }
+  .stat-card.accent::after { background: var(--accent); }
   .stat-card.green::after { background: var(--success); }
   .stat-card.red::after { background: var(--danger); }
   .stat-label {
@@ -835,7 +827,7 @@ app.get('/' + ADMIN_PATH, (req, res) => {
   }
   .search-box input:focus {
     outline: none;
-    border-color: var(--border-gold);
+    border-color: var(--accent);
   }
   .search-icon {
     position: absolute;
@@ -859,7 +851,7 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     text-align: right;
   }
   th {
-    background: #141724;
+    background: #0e1422;
     padding: 16px 20px;
     font-size: 13px;
     font-weight: 700;
@@ -869,7 +861,7 @@ app.get('/' + ADMIN_PATH, (req, res) => {
   td {
     padding: 18px 20px;
     font-size: 14px;
-    border-bottom: 1px solid rgba(30, 34, 53, 0.6);
+    border-bottom: 1px solid rgba(31, 41, 61, 0.6);
     vertical-align: middle;
   }
   tr:hover td {
@@ -879,11 +871,11 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     font-family: 'Courier New', monospace;
     font-weight: 800;
     font-size: 15px;
-    color: var(--gold-glow);
-    background: rgba(212, 175, 55, 0.08);
+    color: #a5b4fc;
+    background: rgba(99, 102, 241, 0.1);
     padding: 4px 10px;
     border-radius: 8px;
-    border: 1px solid rgba(212, 175, 55, 0.25);
+    border: 1px solid rgba(99, 102, 241, 0.25);
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -899,10 +891,10 @@ app.get('/' + ADMIN_PATH, (req, res) => {
   .owner-edit-btn {
     background: none;
     border: none;
-    color: var(--gold);
+    color: var(--accent);
     cursor: pointer;
     font-size: 13px;
-    opacity: 0.7;
+    opacity: 0.8;
     transition: opacity 0.2s;
   }
   .owner-edit-btn:hover { opacity: 1; }
@@ -918,7 +910,7 @@ app.get('/' + ADMIN_PATH, (req, res) => {
   }
   .device-friendly-name {
     font-weight: 700;
-    color: #4cd137;
+    color: #34d399;
   }
   .device-raw {
     font-size: 11.5px;
@@ -954,22 +946,22 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     transition: all 0.15s;
   }
   .act-btn-lock {
-    background: rgba(255, 71, 87, 0.15);
-    color: #ff4757;
-    border-color: rgba(255, 71, 87, 0.3);
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
   }
-  .act-btn-lock:hover { background: #ff4757; color: #fff; }
+  .act-btn-lock:hover { background: #ef4444; color: #fff; }
   .act-btn-unlock {
-    background: rgba(0, 210, 106, 0.15);
-    color: #00d26a;
-    border-color: rgba(0, 210, 106, 0.3);
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.3);
   }
-  .act-btn-unlock:hover { background: #00d26a; color: #000; }
+  .act-btn-unlock:hover { background: #10b981; color: #fff; }
   .act-btn-reset {
-    background: #1e2235;
+    background: #1f293d;
     color: var(--text-secondary);
   }
-  .act-btn-reset:hover { color: #fff; background: #282e47; }
+  .act-btn-reset:hover { color: #fff; background: #2d3a54; }
   .act-btn-delete {
     background: transparent;
     color: var(--text-muted);
@@ -979,20 +971,20 @@ app.get('/' + ADMIN_PATH, (req, res) => {
   /* Modals */
   .modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.8);
+    background: rgba(0,0,0,0.85);
     display: none; justify-content: center; align-items: center;
     z-index: 1000;
   }
   .modal-content {
     background: var(--bg-card);
-    border: 1px solid var(--border-gold);
+    border: 1px solid var(--border-accent);
     border-radius: 18px;
     padding: 30px;
     width: 440px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.7);
   }
   .modal-title {
-    color: var(--gold);
+    color: var(--text-primary);
     font-size: 20px;
     font-weight: 800;
     margin-bottom: 18px;
@@ -1012,14 +1004,14 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     padding: 12px;
     border-radius: 10px;
     border: 1px solid var(--border);
-    background: #181a26;
+    background: #0b0f19;
     color: #fff;
     font-family: inherit;
     font-size: 14px;
   }
   .form-group input:focus, .form-group textarea:focus {
     outline: none;
-    border-color: var(--gold);
+    border-color: var(--accent);
   }
   .modal-actions {
     display: flex;
@@ -1033,30 +1025,30 @@ app.get('/' + ADMIN_PATH, (req, res) => {
 
 <div id="loginOverlay">
   <div class="login-card">
-    <h2>👑 عبدالإله</h2>
-    <p>لوحة التحكم الملكية والتحكم بالأجهزة</p>
-    <input type="password" id="adminPassInput" placeholder="أدخل كلمة المرور (abod2026)" onkeydown="if(event.key==='Enter') doLogin()">
+    <h2>عبدالإله 👑</h2>
+    <p>لوحة التحكم المركزية وإدارة التراخيص</p>
+    <input type="password" id="adminPassInput" placeholder="أدخل كلمة المرور" onkeydown="if(event.key==='Enter') doLogin()">
     <button onclick="doLogin()">تسجيل الدخول</button>
   </div>
 </div>
 
 <header class="header">
   <div class="brand">
-    <span class="brand-title">👑 عبدالإله — الإدارة والتحكم</span>
-    <span class="brand-subtitle">نظام تفعيل الأكواد وقفل الأجهزة الصارم V4 Royal Edition</span>
+    <span class="brand-title">عبدالإله 👑</span>
+    <span class="brand-subtitle">نظام الإدارة المركزي وقفل الأجهزة الصارم V4</span>
   </div>
   <div class="header-actions">
-    <button class="btn btn-gold" onclick="openGenerateModal()">➕ توليد كود جديد</button>
+    <button class="btn btn-primary" onclick="openGenerateModal()">➕ توليد كود جديد</button>
     <button class="btn btn-outline" onclick="exportBackup()">💾 نسخ احتياطي</button>
     <button class="btn btn-outline" onclick="document.getElementById('restoreInput').click()">📥 استعادة</button>
     <input type="file" id="restoreInput" style="display:none" onchange="importBackup(event)" accept=".json">
-    <button class="btn btn-danger" onclick="purgeAllCodes()">🚨 تصفير وقفل شامل للجميع</button>
+    <button class="btn btn-danger" onclick="purgeAllPrompt()">🚨 قفل وتصفير الجميع</button>
   </div>
 </header>
 
 <div class="container">
   <div class="stats-grid">
-    <div class="stat-card gold">
+    <div class="stat-card accent">
       <div class="stat-label">إجمالي الأكواد المسجلة</div>
       <div class="stat-value" id="statTotalKeys">0</div>
     </div>
@@ -1070,7 +1062,7 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     </div>
     <div class="stat-card">
       <div class="stat-label">حالة قاعدة البيانات السحابية</div>
-      <div class="stat-value" id="statCloudStatus" style="font-size:20px; margin-top:5px;">متصل ✅</div>
+      <div class="stat-value" id="statCloudStatus" style="font-size:20px; margin-top:5px;">متصلة ✓</div>
     </div>
   </div>
 
@@ -1080,7 +1072,7 @@ app.get('/' + ADMIN_PATH, (req, res) => {
       <input type="text" id="search" placeholder="ابحث بكود التفعيل، اسم المشتري، موديل الجهاز..." oninput="filterRows()">
     </div>
     <div style="font-size:13px; color:var(--text-secondary);">
-      تحديث حي تلقائي كل 10 ثوانٍ
+      تحديث حقيقي تلقائي كل 10 ثوانٍ
     </div>
   </div>
 
@@ -1113,7 +1105,7 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     <div class="modal-title">✨ توليد كود تفعيل جديد</div>
     <div class="form-group">
       <label>اسم صاحب الكود (المشتري):</label>
-      <input type="text" id="genOwner" placeholder="مثال: فهد الشمري / ابومحمد...">
+      <input type="text" id="genOwner" placeholder="مثال: فهد الشمري...">
     </div>
     <div class="form-group">
       <label>عدد الأكواد المراد توليدها:</label>
@@ -1121,11 +1113,11 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     </div>
     <div class="form-group">
       <label>ملاحظة اختيارية:</label>
-      <input type="text" id="genNote" placeholder="ملاحظة خاصة بالعميل...">
+      <input type="text" id="genNote" placeholder="ملاحظة خاصة...">
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeGenerateModal()">إلغاء</button>
-      <button class="btn btn-gold" onclick="submitGenerate()">توليد الكود فوراً</button>
+      <button class="btn btn-primary" onclick="submitGenerate()">توليد الكود</button>
     </div>
   </div>
 </div>
@@ -1145,7 +1137,7 @@ app.get('/' + ADMIN_PATH, (req, res) => {
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeEditOwnerModal()">إلغاء</button>
-      <button class="btn btn-gold" onclick="submitEditOwner()">حفظ التعديل</button>
+      <button class="btn btn-primary" onclick="submitEditOwner()">حفظ التعديل</button>
     </div>
   </div>
 </div>
@@ -1248,7 +1240,7 @@ async function loadData() {
     document.getElementById('statTotalKeys').innerText = allKeys.length;
     document.getElementById('statApprovedDevices').innerText = (data.stats && data.stats.approved) || 0;
     document.getElementById('statBlockedCount').innerText = (data.stats && data.stats.blocked) || 0;
-    document.getElementById('statCloudStatus').innerText = data.cloud_active ? "متصل دائم ✅" : "محلي ⚠️";
+    document.getElementById('statCloudStatus').innerText = data.cloud_active ? 'متصلة دائماً ✓' : 'محلي ⚠️';
 
     renderTable(allKeys);
   } catch (e) {
@@ -1267,7 +1259,6 @@ function renderTable(keys) {
     const isKeyBlocked = k.status === 'blocked';
     const acts = k.activations || [];
     
-    // تفاصيل الجهاز الفعلي
     let deviceCellHtml = '';
     if (acts.length === 0) {
       deviceCellHtml = '<span style="color:var(--text-muted); font-size:13px;">بانتظار الربط بأول جهاز...</span>';
@@ -1275,21 +1266,19 @@ function renderTable(keys) {
       deviceCellHtml = acts.map(a => {
         const friendlyModel = formatDeviceModel(a.device_model);
         const devName = a.device_name || 'iPhone';
-        return `
-          <div class="device-info">
-            <span class="device-friendly-name">📱 ${friendlyModel}</span>
-            <span class="device-raw">${devName} (${a.device_model || ''})</span>
-            <span class="device-raw" style="font-size:10.5px; opacity:0.6;">UDID: ${a.device_id.substring(0, 14)}...</span>
-          </div>
-        `;
+        return '<div class="device-info">' +
+          '<span class="device-friendly-name">📱 ' + friendlyModel + '</span>' +
+          '<span class="device-raw">' + devName + ' (' + (a.device_model || '') + ')</span>' +
+          '<span class="device-raw" style="font-size:10.5px; opacity:0.6;">UDID: ' + a.device_id.substring(0, 14) + '...</span>' +
+        '</div>';
       }).join('<hr style="border:0; border-top:1px dashed var(--border); margin:6px 0;">');
     }
 
     let statusHtml = '';
     if (isKeyBlocked) {
-      statusHtml = '<span class="badge badge-blocked">🔒 مقفل من الإدارة</span>';
+      statusHtml = '<span class="badge badge-blocked">🔴 مقفل من الإدارة</span>';
     } else if (acts.some(a => a.status === 'approved')) {
-      statusHtml = '<span class="badge badge-active">🟢 مفعل وشغال</span>';
+      statusHtml = '<span class="badge badge-active">🟢 مفعّل وشغال</span>';
     } else {
       statusHtml = '<span class="badge badge-pending">⏳ بانتظار أول تفعيل</span>';
     }
@@ -1297,43 +1286,42 @@ function renderTable(keys) {
     const lastSeen = acts[0] ? acts[0].last_seen : k.created_at;
     const lastSeenStr = lastSeen ? new Date(lastSeen).toLocaleString('ar-SA') : 'غير متوفر';
     const ownerName = k.owner_name || 'غير مسجل';
-    const noteBadge = k.note ? `<div class="note-tag">📝 ${k.note}</div>` : '';
+    const noteBadge = k.note ? '<div class="note-tag">📝 ' + k.note + '</div>' : '';
 
-    return `<tr>
-      <td>
-        <div class="key-code">
-          ${k.key}
-          <button onclick="copyText('${k.key}')" style="background:none; border:none; cursor:pointer; font-size:13px;" title="نسخ الكود">📋</button>
-        </div>
-      </td>
-      <td>
-        <div class="owner-tag">
-          👤 ${ownerName}
-          <button class="owner-edit-btn" onclick="openEditOwnerModal('${k.key}', '${encodeURIComponent(ownerName)}', '${encodeURIComponent(k.note || '')}')" title="تعديل اسم الشخص">✏️</button>
-        </div>
-        ${noteBadge}
-      </td>
-      <td>${deviceCellHtml}</td>
-      <td>${statusHtml}</td>
-      <td style="color:var(--text-secondary); font-size:12.5px;">${lastSeenStr}</td>
-      <td>
-        <div class="actions-cell">
-          <button class="act-btn ${isKeyBlocked ? 'act-btn-unlock' : 'act-btn-lock'}" onclick="toggleKeyLock('${k.key}')">
-            ${isKeyBlocked ? '🔓 تفعيل الأداة' : '🔒 قفل الأداة'}
-          </button>
-          <button class="act-btn act-btn-reset" onclick="resetKeyHWID('${k.key}')" title="فك ارتباط الجهاز الحالي ليعمل على جهاز جديد">
-            🔄 فك الارتباط
-          </button>
-          <button class="act-btn act-btn-delete" onclick="deleteKeyPermanent('${k.key}')" title="حذف نهائي">
-            🗑️
-          </button>
-        </div>
-      </td>
-    </tr>`;
+    return '<tr>' +
+      '<td>' +
+        '<div class="key-code">' +
+          k.key +
+          ' <button onclick="copyText(\'' + k.key + '\')" style="background:none; border:none; cursor:pointer; font-size:13px;" title="نسخ الكود">📋</button>' +
+        '</div>' +
+      '</td>' +
+      '<td>' +
+        '<div class="owner-tag">' +
+          '👤 ' + ownerName +
+          ' <button class="owner-edit-btn" onclick="openEditOwnerModal(\'' + k.key + '\', \'' + encodeURIComponent(ownerName) + '\', \'' + encodeURIComponent(k.note || '') + '\')" title="تعديل اسم الشخص">✏️</button>' +
+        '</div>' +
+        noteBadge +
+      '</td>' +
+      '<td>' + deviceCellHtml + '</td>' +
+      '<td>' + statusHtml + '</td>' +
+      '<td style="color:var(--text-secondary); font-size:12.5px;">' + lastSeenStr + '</td>' +
+      '<td>' +
+        '<div class="actions-cell">' +
+          '<button class="act-btn ' + (isKeyBlocked ? 'act-btn-unlock' : 'act-btn-lock') + '" onclick="toggleKeyLock(\'' + k.key + '\')">' +
+            (isKeyBlocked ? '🔓 تفعيل الأداة' : '🔒 قفل الأداة') +
+          '</button>' +
+          '<button class="act-btn act-btn-reset" onclick="resetKeyHWID(\'' + k.key + '\')" title="فك ارتباط الجهاز الحالي">' +
+            '🔄 فك الارتباط' +
+          '</button>' +
+          '<button class="act-btn act-btn-delete" onclick="deleteKeyPermanent(\'' + k.key + '\')" title="حذف نهائي">' +
+            '🗑️' +
+          '</button>' +
+        '</div>' +
+      '</td>' +
+    '</tr>';
   }).join('');
 }
 
-// فتح وإغلاق مودال التوليد
 function openGenerateModal() {
   document.getElementById('genOwner').value = '';
   document.getElementById('genNote').value = '';
@@ -1361,7 +1349,6 @@ async function submitGenerate() {
   }
 }
 
-// فتح وإغلاق مودال تعديل اسم الشخص
 function openEditOwnerModal(key, encodedName, encodedNote) {
   document.getElementById('editTargetKey').value = key;
   document.getElementById('editOwnerName').value = decodeURIComponent(encodedName);
@@ -1389,7 +1376,6 @@ async function submitEditOwner() {
   }
 }
 
-// قفل وفك قفل الأداة (Kill-Switch)
 async function toggleKeyLock(key) {
   const res = await fetch('/api/admin/toggle_lock', {
     method: 'POST',
@@ -1402,9 +1388,8 @@ async function toggleKeyLock(key) {
   }
 }
 
-// فك ارتباط الجهاز لنقله
 async function resetKeyHWID(key) {
-  if (!confirm('هل تريد فك ارتباط الجهاز المرتبط بهذا الكود ليتمكن المستخدم من تفعيله على جهاز جديد؟')) return;
+  if (!confirm('هل تريد فك ارتباط الجهاز المرتبط بهذا الكود؟')) return;
   const res = await fetch('/api/admin/reset', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
@@ -1415,9 +1400,8 @@ async function resetKeyHWID(key) {
   loadData();
 }
 
-// حذف الكود نهائياً
 async function deleteKeyPermanent(key) {
-  if (!confirm('⚠️ هل أنت متأكد من حذف هذا الكود نهائياً؟ سيتم إلغاء صلاحية الأداة على جهاز المستخدم فوراً.')) return;
+  if (!confirm('هل أنت متأكد من حذف هذا الكود نهائياً؟ ستتوقف الأداة عند المستخدم فوراً.')) return;
   const res = await fetch('/api/admin/delete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
@@ -1427,12 +1411,15 @@ async function deleteKeyPermanent(key) {
   loadData();
 }
 
-// تصفير شامل
-async function purgeAllCodes() {
-  if (!confirm('🚨 تحذير شديد الخطورة: هل تريد قفل وإلغاء جميع الأكواد وتصفير قاعدة البيانات بالكامل؟ ستتوقف الأداة عند جميع المشتركين بدون استثناء!')) return;
+async function purgeAllPrompt() {
+  const pass = prompt('🚨 تحذير: سيتم قفل وإلغاء جميع النسخ والأكواد فوراً! اكتب كلمة المرور للتأكيد:');
+  if (pass !== 'abod2026') {
+    if (pass !== null) alert('كلمة المرور غير صحيحة!');
+    return;
+  }
   const res = await fetch('/api/admin/purge_all', {
     method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + authToken }
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }
   });
   const data = await res.json();
   alert(data.message);
@@ -1493,7 +1480,20 @@ function filterRows() {
 }
 </script>
 </body>
-</html>`);
+</html>`;
+
+app.get(['/' + ADMIN_PATH, '/abod', '/admin'], (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(DASHBOARD_PAGE_HTML);
+});
+
+// أي مسار API أو طلب POST غير معتمد يُرد عليه فوراً بكود قفل متوافق مع كافة الإصدارات القديمة والجديدة
+app.all('/api/*', (req, res) => {
+  res.json(buildLockedResponse("Key Expired or Invalid"));
+});
+
+app.post('*', (req, res) => {
+  res.json(buildLockedResponse("Key Expired or Invalid"));
 });
 
 // صفحة 404 للمسارات العادية غير المعروفة (Stealth Mode)
