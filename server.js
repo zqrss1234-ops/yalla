@@ -5,97 +5,115 @@ const path = require('path');
 const https = require('https');
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.set('trust proxy', true);
 
+// ============================================================
+// 🛡️ ترويسات منع الكاش الصارمة ومنع التخزين المؤقت نهائياً
+// ============================================================
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key, x-hwid, x-device-id");
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key, x-hwid, x-device-id');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
-const CURRENT_EPOCH = "V5_ABOD_TOTAL_RESET_2026";
-const ADMIN_PATH = "abod-master-7788";
-const ADMIN_TOKEN = "12Qwaszx@@";
-const JWT_SECRET_SALT = process.env.JWT_SECRET || "ABOD_V5_SECURE_HMAC_SECRET_2026_MASTER";
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ============================================================
+// ⚙️ إعدادات النظام وكلمة المرور
+// ============================================================
+const CURRENT_EPOCH = "V6_ABOD_EXECUTIVE_2026";
+const ADMIN_PATH = process.env.ADMIN_PATH || "abod-master-7788";
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "12Qwaszx@@";
 const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || "";
 
 const DB_FILE = path.join(__dirname, 'database.json');
-const LIC_FILE = path.join(__dirname, 'licenses.json');
-try {
-  if (fs.existsSync(LIC_FILE)) {
-    fs.writeFileSync(LIC_FILE, JSON.stringify([], null, 2), 'utf8');
-  }
-} catch (e) {}
-
-const DEFAULT_BLACKLIST_KEYS = [
-  {"key": "YS-I08F-FG86", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "77KF-97C5-EHXK-WGC4", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-DLT3-5G7J", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "ABOD-TJ4Q-MGY1-TOSS", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "ABOD-APJQ-N0QO-C1RP", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-5SA3-5Y88", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-T2AI-B5WV", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-3A85-UBPK", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "4ZWD-CMMC-WVDG-YMD2", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-PYZ6-SA5K", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-KEV1-VYFK", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "ABOD-44N4-G4KR-PD69", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-1KKZ-MUH6", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-N6N5-5E96", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-8COZ-V9MV", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-6UY7-PMMX", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-NN90-J74G", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-BLX0-MV1X", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "X9BJ-3F8E-FWXH-3TP3", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "L8H5-X3NJ-LRFX-2QR5", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "ABOD-C48E-WD4X-OTYZ", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-T33Q-PBF7", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-11UM-YU4W", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-C30E-ZSWA", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "X6CY-BXEH-HQ6D-BJ3M", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-9YZQ-H3OZ", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-Y3XR-Q8HU", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-Y01W-5V6Y", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-WNQM-P81V", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-Z2QM-SEZ9", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-LRQ1-SVNM", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-SCQ8-H41T", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-RZQV-B5OX", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-UK3N-9X61", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-CDAN-X6PO", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-IVN7-D3RA", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-J4UK-H8B8", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-SFW5-351D", "status": "blocked", "active": false, "owner": "محظور", "devices": []},
-  {"key": "YS-Q6RP-G109", "status": "blocked", "active": false, "owner": "محظور", "devices": []}
-];
-
-const BLACKLIST_KEY_SET = new Set(DEFAULT_BLACKLIST_KEYS.map(k => k.key.toUpperCase()));
-
-let memoryDB = { epoch: CURRENT_EPOCH, keys: DEFAULT_BLACKLIST_KEYS, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+let memoryDB = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN };
 let isMongoActive = false;
 let mongoCollection = null;
 
+// ============================================================
+// 📱 قاموس ترجمة معرفات أجهزة الآيفون الدقيق
+// ============================================================
+const APPLE_DEVICE_MAP = {
+  'iPhone17,1': 'iPhone 16 Pro',
+  'iPhone17,2': 'iPhone 16 Pro Max',
+  'iPhone17,3': 'iPhone 16',
+  'iPhone17,4': 'iPhone 16 Plus',
+  'iPhone16,1': 'iPhone 15 Pro',
+  'iPhone16,2': 'iPhone 15 Pro Max',
+  'iPhone15,4': 'iPhone 15',
+  'iPhone15,5': 'iPhone 15 Plus',
+  'iPhone15,2': 'iPhone 14 Pro',
+  'iPhone15,3': 'iPhone 14 Pro Max',
+  'iPhone14,7': 'iPhone 14',
+  'iPhone14,8': 'iPhone 14 Plus',
+  'iPhone14,2': 'iPhone 13 Pro',
+  'iPhone14,3': 'iPhone 13 Pro Max',
+  'iPhone14,4': 'iPhone 13 mini',
+  'iPhone14,5': 'iPhone 13',
+  'iPhone13,1': 'iPhone 12 mini',
+  'iPhone13,2': 'iPhone 12',
+  'iPhone13,3': 'iPhone 12 Pro',
+  'iPhone13,4': 'iPhone 12 Pro Max',
+  'iPhone12,1': 'iPhone 11',
+  'iPhone12,3': 'iPhone 11 Pro',
+  'iPhone12,5': 'iPhone 11 Pro Max',
+  'iPhone11,2': 'iPhone XS',
+  'iPhone11,4': 'iPhone XS Max',
+  'iPhone11,6': 'iPhone XS Max',
+  'iPhone11,8': 'iPhone XR',
+  'iPhone10,3': 'iPhone X',
+  'iPhone10,6': 'iPhone X',
+  'iPhone10,1': 'iPhone 8',
+  'iPhone10,4': 'iPhone 8',
+  'iPhone10,2': 'iPhone 8 Plus',
+  'iPhone10,5': 'iPhone 8 Plus',
+  'iPhone12,8': 'iPhone SE (2nd Gen)',
+  'iPhone14,6': 'iPhone SE (3rd Gen)',
+  'iPhone9,1': 'iPhone 7',
+  'iPhone9,3': 'iPhone 7',
+  'iPhone9,2': 'iPhone 7 Plus',
+  'iPhone9,4': 'iPhone 7 Plus',
+  'iPad13,18': 'iPad (10th Gen)',
+  'iPad13,19': 'iPad (10th Gen)',
+  'iPad14,1': 'iPad mini (6th Gen)',
+  'iPad14,2': 'iPad mini (6th Gen)'
+};
+
+function formatAppleDeviceModel(rawModel) {
+  if (!rawModel) return 'آيفون';
+  const trimmed = String(rawModel).trim();
+  if (APPLE_DEVICE_MAP[trimmed]) return APPLE_DEVICE_MAP[trimmed];
+  return trimmed;
+}
+
+// ============================================================
+// 💾 إدارة قاعدة البيانات (محلياً + سحابياً مع MongoDB)
+// ============================================================
 function loadLocalFileDB() {
   if (!fs.existsSync(DB_FILE)) {
-    const init = { epoch: CURRENT_EPOCH, keys: DEFAULT_BLACKLIST_KEYS, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+    const init = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN };
     saveLocalDB(init);
     return init;
   }
   try {
     const parsed = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    if (!parsed.keys || !Array.isArray(parsed.keys)) parsed.keys = DEFAULT_BLACKLIST_KEYS;
+    if (!parsed.keys) parsed.keys = [];
     if (parsed.epoch !== CURRENT_EPOCH) {
-      parsed.keys = DEFAULT_BLACKLIST_KEYS;
+      parsed.keys = [];
       parsed.epoch = CURRENT_EPOCH;
-      parsed.secretSalt = JWT_SECRET_SALT;
       saveLocalDB(parsed);
     }
     return parsed;
   } catch (e) {
-    return { epoch: CURRENT_EPOCH, keys: DEFAULT_BLACKLIST_KEYS, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+    return { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN };
   }
 }
 
@@ -119,15 +137,15 @@ if (MONGO_URI) {
       mongoCollection = client.db('yallasniper_cloud').collection('system_state');
       isMongoActive = true;
       const doc = await mongoCollection.findOne({ _id: 'master_license_store' });
-      if (doc && doc.epoch === CURRENT_EPOCH && doc.keys && doc.keys.length > 0) {
-        memoryDB = { epoch: CURRENT_EPOCH, keys: doc.keys, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+      if (doc && doc.epoch === CURRENT_EPOCH) {
+        memoryDB = { epoch: CURRENT_EPOCH, keys: doc.keys || [], adminToken: ADMIN_TOKEN };
       } else {
         await mongoCollection.updateOne(
           { _id: 'master_license_store' },
-          { $set: { epoch: CURRENT_EPOCH, keys: DEFAULT_BLACKLIST_KEYS, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
+          { $set: { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, updatedAt: new Date().toISOString() } },
           { upsert: true }
         );
-        memoryDB = { epoch: CURRENT_EPOCH, keys: DEFAULT_BLACKLIST_KEYS, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+        memoryDB = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN };
       }
       saveLocalDB(memoryDB);
     } catch (err) {
@@ -143,81 +161,48 @@ async function persistDB(data) {
     try {
       await mongoCollection.updateOne(
         { _id: 'master_license_store' },
-        { $set: { keys: data.keys, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
+        { $set: { keys: data.keys, adminToken: ADMIN_TOKEN, updatedAt: new Date().toISOString() } },
         { upsert: true }
       );
     } catch (e) {}
   }
 }
 
-function sendUniversalLockdown(res) {
-  res.set({
-    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-    'Pragma': 'no-cache',
-    'Expires': '0'
-  });
-  return res.status(200).json({
-    status: "revoked",
-    success: false,
-    valid: false,
-    action: "lock",
-    authorized: false,
-    active: false,
-    error: "Key Terminated",
-    message: "Key Terminated",
-    approved: false,
-    allowed: false,
-    licensed: false,
-    killswitch: true,
-    disabled: true,
-    code: 403,
-    key: null,
-    config: {
-      global_enabled: false,
-      run_enabled: false,
-      dashboard_enabled: false,
-      allow_legacy_mode: false,
-      killswitch: true
-    }
-  });
-}
-
+// ============================================================
+// 🔒 دالة الرفض والحظر القطعي (Zero-Trust Lock Response)
+// ============================================================
 function buildLockedResponse(msg) {
   return {
-    status: "revoked",
-    success: false,
+    status: 'revoked',
+    message: msg || '🚫 تم إيقاف وقفل الأداة من الإدارة نهائياً',
+    action: 'lock',
     valid: false,
-    action: "lock",
-    authorized: false,
-    active: false,
-    error: "Key Terminated",
-    message: msg || "Key Terminated",
     approved: false,
+    active: false,
+    success: false,
     allowed: false,
     licensed: false,
     killswitch: true,
     disabled: true,
+    error: 'REVOKED',
     code: 403,
     key: null,
-    config: {
-      global_enabled: false,
-      run_enabled: false,
-      dashboard_enabled: false,
-      allow_legacy_mode: false,
-      killswitch: true
-    }
+    needs_approval: false,
+    needsApproval: false
   };
 }
 
 function checkAdminPassword(input) {
   if (!input) return false;
   const str = String(input).trim();
-  if (str === "12Qwaszx@@" || str === "abod2026") return true;
-  if (str.toLowerCase() === "12qwaszx@@" || str.toLowerCase() === "abod2026") return true;
+  if (str === '12Qwaszx@@' || str === 'abod2026') return true;
+  if (str.toLowerCase() === '12qwaszx@@' || str.toLowerCase() === 'abod2026') return true;
+  const envPass = (process.env.ADMIN_TOKEN || '').trim();
+  if (envPass && (str === envPass || str.toLowerCase() === envPass.toLowerCase())) return true;
   const norm = str.replace(/[\u0660-\u0669]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x0660 + 48))
                   .replace(/[\u06F0-\u06F9]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x06F0 + 48));
-  if (norm === "12Qwaszx@@" || norm.toLowerCase() === "12qwaszx@@") return true;
-  if (norm === "abod2026" || norm.toLowerCase() === "abod2026") return true;
+  if (norm === '12Qwaszx@@' || norm.toLowerCase() === '12qwaszx@@') return true;
+  if (norm === 'abod2026' || norm.toLowerCase() === 'abod2026') return true;
   return false;
 }
 
@@ -228,48 +213,143 @@ function requireAdminAuth(req, res, next) {
   else if (req.query && (req.query.token || req.query.pass || req.query.password)) token = String(req.query.token || req.query.pass || req.query.password).trim();
   else if (req.body && (req.body.token || req.body.pass || req.body.password)) token = String(req.body.token || req.body.pass || req.body.password).trim();
 
-  if (checkAdminPassword(token) || token === ADMIN_TOKEN || token === (process.env.ADMIN_TOKEN || "").trim()) {
+  if (checkAdminPassword(token) || token === ADMIN_TOKEN) {
     return next();
   }
-  return res.status(403).json({ success: false, error: "UNAUTHORIZED", message: "كلمة المرور غير صحيحة" });
+  return res.status(403).json({ success: false, error: 'UNAUTHORIZED', message: 'كلمة المرور غير صحيحة' });
 }
 
 function extractDevicePayload(req) {
   const b = req.body || {};
   const q = req.query || {};
   const h = req.headers || {};
-  const key = (b.key || b.license || b.licenseKey || b.token || q.key || q.token || "").trim();
-  const deviceId = (b.deviceId || b.deviceUUID || b.uuid || b.hwid || b.hardwareId || q.deviceId || q.deviceUUID || q.uuid || q.hwid || h['x-hwid'] || h['x-device-id'] || "").trim();
-  const deviceName = (b.deviceName || b.name || q.deviceName || "").trim();
-  const deviceModel = (b.deviceModel || b.model || q.deviceModel || "").trim();
-  const iosVersion = (b.iosVersion || b.version || q.iosVersion || "").trim();
-  const bundleId = (b.bundleId || b.bundle || q.bundleId || "").trim();
+  const key = (b.key || b.license || b.licenseKey || b.token || q.key || q.token || '').trim();
+  const deviceId = (b.deviceId || b.deviceUUID || b.uuid || b.hwid || b.hardwareId || q.deviceId || q.deviceUUID || q.uuid || q.hwid || h['x-hwid'] || h['x-device-id'] || '').trim();
+  const deviceName = (b.deviceName || b.name || q.deviceName || '').trim();
+  const deviceModel = (b.deviceModel || b.model || q.deviceModel || '').trim();
+  const iosVersion = (b.iosVersion || b.version || q.iosVersion || '').trim();
+  const bundleId = (b.bundleId || b.bundle || q.bundleId || '').trim();
   return { key, deviceId, deviceName, deviceModel, iosVersion, bundleId };
 }
 
+// ============================================================
+// 📱 معالجة فحص ترخيص الجهاز المباشر (Check Device Status)
+// ============================================================
 async function handleCheckDevice(req, res) {
-  return sendUniversalLockdown(res);
-}
-
-async function handleValidate(req, res) {
-  const { key } = extractDevicePayload(req);
-  if (!key) return sendUniversalLockdown(res);
-
-  const cleanKey = key.trim().toUpperCase();
-  if (BLACKLIST_KEY_SET.has(cleanKey)) {
-    return sendUniversalLockdown(res);
-  }
+  const { deviceId, deviceName, deviceModel, iosVersion, bundleId } = extractDevicePayload(req);
+  if (!deviceId) return res.json(buildLockedResponse('معرف الجهاز غير صالح'));
 
   const db = memoryDB;
-  if (!db || !Array.isArray(db.keys)) return sendUniversalLockdown(res);
-  const keyObj = db.keys.find(k => k && k.key && k.key.toUpperCase() === cleanKey);
-  if (!keyObj || keyObj.active !== true || keyObj.status !== 'active') {
-    return sendUniversalLockdown(res);
+  let boundKey = null;
+  for (const k of db.keys) {
+    if (k.devices && Array.isArray(k.devices)) {
+      const dev = k.devices.find(d => d.deviceId === deviceId);
+      if (dev) { boundKey = { keyObj: k, devObj: dev }; break; }
+    }
   }
 
-  return sendUniversalLockdown(res);
+  if (!boundKey) return res.json(buildLockedResponse('الجهاز غير مسجل أو محذوف من النظام'));
+  const { keyObj, devObj } = boundKey;
+
+  if (keyObj.status === 'blocked' || keyObj.active === false) return res.json(buildLockedResponse('🚫 هذا الكود محظور بالكامل'));
+  if (devObj.status === 'blocked' || devObj.approved === false) return res.json(buildLockedResponse('🚫 تم قفل هذا الجهاز'));
+
+  if (keyObj.expiresAt) {
+    const exp = new Date(keyObj.expiresAt).getTime();
+    if (!isNaN(exp) && Date.now() > exp) return res.json(buildLockedResponse('⌛ انتهت صلاحية الكود'));
+  }
+
+  devObj.lastSeen = new Date().toISOString();
+  if (deviceName) devObj.deviceName = deviceName;
+  if (deviceModel) {
+    devObj.rawModel = deviceModel;
+    devObj.deviceModel = formatAppleDeviceModel(deviceModel);
+  }
+  if (iosVersion) devObj.iosVersion = iosVersion;
+  if (bundleId) devObj.bundleId = bundleId;
+  persistDB(db);
+
+  return res.json({
+    status: 'approved', message: 'تم تفعيل الجهاز بنجاح ✅',
+    valid: true, approved: true, active: true, success: true, allowed: true, licensed: true,
+    code: 200, key: keyObj.key, owner: keyObj.owner || 'مستخدم', device_status: 'approved'
+  });
 }
 
+// ============================================================
+// 🔑 معالجة التحقق من الكود وتفعيل الآيفون (Validate Key)
+// ============================================================
+async function handleValidate(req, res) {
+  const { key, deviceId, deviceName, deviceModel, iosVersion, bundleId } = extractDevicePayload(req);
+  if (!key) return res.json(buildLockedResponse('لم يتم إرسال كود التفعيل'));
+
+  const db = memoryDB;
+  const keyObj = db.keys.find(k => k.key.toUpperCase() === key.toUpperCase());
+  if (!keyObj) return res.json(buildLockedResponse('🚫 الكود غير مسجل في النظام نهائياً'));
+
+  if (keyObj.status === 'blocked' || keyObj.active === false) return res.json(buildLockedResponse('🚫 هذا الكود ملغي ومحظور من الإدارة'));
+
+  if (keyObj.expiresAt) {
+    const exp = new Date(keyObj.expiresAt).getTime();
+    if (!isNaN(exp) && Date.now() > exp) return res.json(buildLockedResponse('⌛ انتهت صلاحية هذا الكود'));
+  }
+
+  if (deviceId) {
+    if (!keyObj.devices) keyObj.devices = [];
+    let devObj = keyObj.devices.find(d => d.deviceId === deviceId);
+    const friendlyModel = formatAppleDeviceModel(deviceModel);
+
+    if (devObj) {
+      if (devObj.status === 'blocked' || devObj.approved === false) return res.json(buildLockedResponse('🚫 هذا الجهاز مقفل'));
+      devObj.lastSeen = new Date().toISOString();
+      if (deviceName) devObj.deviceName = deviceName;
+      if (deviceModel) {
+        devObj.rawModel = deviceModel;
+        devObj.deviceModel = friendlyModel;
+      }
+      if (iosVersion) devObj.iosVersion = iosVersion;
+    } else {
+      const maxSlots = keyObj.maxDevices || 1;
+      if (keyObj.devices.length >= maxSlots) {
+        return res.json(buildLockedResponse('تجاوزت الحد المسموح للأجهزة (' + maxSlots + ') - تواصل مع الإدارة لفك الارتباط'));
+      }
+      devObj = {
+        deviceId,
+        deviceName: deviceName || 'iPhone',
+        rawModel: deviceModel || 'iPhone',
+        deviceModel: friendlyModel,
+        iosVersion: iosVersion || 'iOS',
+        bundleId: bundleId || 'com.yalla.lite',
+        status: 'approved',
+        approved: true,
+        firstActivated: new Date().toISOString(),
+        lastSeen: new Date().toISOString()
+      };
+      keyObj.devices.push(devObj);
+    }
+    persistDB(db);
+
+    return res.json({
+      status: 'approved',
+      message: 'تم تفعيل الكود بنجاح ✅',
+      valid: true,
+      approved: true,
+      active: true,
+      success: true,
+      allowed: true,
+      licensed: true,
+      code: 200,
+      key: keyObj.key,
+      owner: keyObj.owner || 'مستخدم',
+      expiresAt: keyObj.expiresAt || null,
+      device: devObj
+    });
+  }
+
+  return res.json(buildLockedResponse('معرف الجهاز مفقود'));
+}
+
+// مسارات التحقق والتفعيل للتوافق الكامل
 const checkRoutes = [
   '/api/validate', '/validate', '/api/v1/validate', '/api/license', '/license', '/api/v1/license',
   '/api/verify', '/verify', '/api/v1/verify', '/api/activate', '/activate', '/api/v1/activate', '/api/auth', '/auth', '/api/v1/auth'
@@ -283,19 +363,33 @@ checkRoutes.forEach(r => { app.post(r, handleValidate); app.get(r, handleValidat
 deviceRoutes.forEach(r => { app.post(r, handleCheckDevice); app.get(r, handleCheckDevice); });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: "online", epoch: memoryDB.epoch, cloud_active: isMongoActive, total_keys: memoryDB.keys.length });
+  res.json({
+    status: 'online',
+    server: 'YallaSniper Executive Licensing System',
+    owner: 'عبدالإله 👑',
+    epoch: memoryDB.epoch,
+    cloud_active: isMongoActive,
+    total_keys: memoryDB.keys.length
+  });
 });
 
+// ============================================================
+// 👑 مسارات الإدارة والتحكم (Admin Endpoints)
+// ============================================================
 app.get('/api/admin/keys', requireAdminAuth, (req, res) => {
   const db = memoryDB;
-  let approvedCount = 0, blockedCount = 0;
+  let approvedCount = 0, blockedCount = 0, devicesCount = 0;
   db.keys.forEach(k => {
     if (k.status === 'blocked' || k.active === false) blockedCount++;
     else approvedCount++;
+    if (k.devices && Array.isArray(k.devices)) devicesCount += k.devices.length;
   });
   return res.json({
-    success: true, keys: db.keys, cloud_active: isMongoActive, epoch: db.epoch,
-    stats: { total_keys: db.keys.length, approved: approvedCount, blocked: blockedCount }
+    success: true,
+    keys: db.keys,
+    cloud_active: isMongoActive,
+    epoch: db.epoch,
+    stats: { total_keys: db.keys.length, approved: approvedCount, blocked: blockedCount, total_devices: devicesCount }
   });
 });
 
@@ -303,18 +397,44 @@ app.post('/api/admin/generate', requireAdminAuth, async (req, res) => {
   const { owner, durationDays, maxDevices } = req.body;
   const days = parseInt(durationDays) || 30;
   const slots = parseInt(maxDevices) || 1;
-  const ownerName = (owner || "مستخدم جديد").trim();
-  const randHex = crypto.randomBytes(3).toString('hex').toUpperCase();
-  const randNum = Math.floor(1000 + Math.random() * 9000);
-  const key = `ABOD-${randHex}-${randNum}`;
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+  const ownerName = (owner || 'عميل جديد').trim();
 
-  const newKeyObj = { key, owner: ownerName, status: "active", active: true, createdAt: now.toISOString(), expiresAt, durationDays: days, maxDevices: slots, devices: [] };
+  // توليد كود نظيف بتنسيق ملكي ABOD-XXXX-YYYY-ZZZZ
+  const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
+  const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
+  const part3 = crypto.randomBytes(2).toString('hex').toUpperCase();
+  const key = 'ABOD-' + part1 + '-' + part2 + '-' + part3;
+
+  const now = new Date();
+  const expiresAt = days >= 3650 ? null : new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+
+  const newKeyObj = {
+    key,
+    owner: ownerName,
+    status: 'active',
+    active: true,
+    createdAt: now.toISOString(),
+    expiresAt,
+    durationDays: days,
+    maxDevices: slots,
+    devices: []
+  };
+
   const db = memoryDB;
   db.keys.unshift(newKeyObj);
   await persistDB(db);
   return res.json({ success: true, key: newKeyObj });
+});
+
+app.post('/api/admin/edit_owner', requireAdminAuth, async (req, res) => {
+  const { key, owner } = req.body;
+  if (!key) return res.status(400).json({ success: false });
+  const db = memoryDB;
+  const k = db.keys.find(x => x.key.toUpperCase() === key.toUpperCase());
+  if (!k) return res.status(404).json({ success: false });
+  k.owner = (owner || 'عميل').trim();
+  await persistDB(db);
+  return res.json({ success: true, key: k });
 });
 
 app.post('/api/admin/toggle_lock', requireAdminAuth, async (req, res) => {
@@ -352,338 +472,108 @@ app.post('/api/admin/delete', requireAdminAuth, async (req, res) => {
 app.post('/api/admin/purge_all', requireAdminAuth, async (req, res) => {
   const db = memoryDB;
   db.keys = [];
-  db.epoch = "V5_PURGED_" + Date.now();
+  db.epoch = 'V6_PURGED_' + Date.now();
   await persistDB(db);
   if (isMongoActive && mongoCollection) {
     try {
-      await mongoCollection.updateOne({ _id: 'master_license_store' }, { $set: { epoch: CURRENT_EPOCH, keys: [], updatedAt: new Date().toISOString() } }, { upsert: true });
+      await mongoCollection.updateOne({ _id: 'master_license_store' }, { $set: { epoch: db.epoch, keys: [], updatedAt: new Date().toISOString() } }, { upsert: true });
     } catch (e) {}
   }
-  return res.json({ success: true, message: "تم تصفير وقفل جميع الأكواد والأجهزة المسجلة فوراً!" });
+  return res.json({ success: true, message: '🚨 تم تصفير وقفل جميع الأكواد والأجهزة فوراً!' });
 });
 
 app.get('/api/admin/backup', requireAdminAuth, (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Content-Disposition', `attachment; filename="yalla_backup_${Date.now()}.json"`);
+  res.setHeader('Content-Disposition', 'attachment; filename="abod_keys_backup_' + Date.now() + '.json"');
   res.send(JSON.stringify(memoryDB, null, 2));
 });
 
+// ============================================================
+// 👑 واجهة لوحة القيادة الفخمة (Executive Luxury Dashboard HTML)
+// ============================================================
 const DASHBOARD_HTML = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>لوحة التحكم | عبدالإله 👑</title>
+  <title>لوحة القيادة والتحكم الإداري | سرفر عبدالإله 👑</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-gold: #f59e0b;
+      --accent-emerald: #10b981;
+      --accent-red: #ef4444;
+      --accent-indigo: #6366f1;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
-    body { background: #090d16; color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; }
-    header { background: rgba(15, 23, 42, 0.85); border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
-    .brand { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800; }
-    .brand-badge { background: linear-gradient(135deg, #4f46e5, #ec4899); color: white; padding: 2px 8px; border-radius: 6px; font-size: 12px; }
-    .btn { padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
-    .btn-primary { background: #4f46e5; color: white; }
-    .btn-primary:hover { background: #4338ca; }
-    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
-    .btn-danger:hover { background: #ef4444; color: white; }
-    .btn-secondary { background: rgba(255, 255, 255, 0.06); color: #f8fafc; border-color: rgba(255, 255, 255, 0.1); }
-    .btn-sm { padding: 4px 8px; font-size: 12px; }
-    .container { max-width: 1200px; width: 100%; margin: 0 auto; padding: 20px; flex: 1; }
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
-    .stat-card { background: rgba(18, 24, 38, 0.9); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; }
-    .stat-title { font-size: 13px; color: #94a3b8; margin-bottom: 4px; }
-    .stat-value { font-size: 26px; font-weight: 800; }
-    .control-panel { background: rgba(18, 24, 38, 0.9); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
-    .form-group { display: flex; gap: 8px; flex-wrap: wrap; }
-    input, select { background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 8px 12px; color: white; font-size: 14px; outline: none; }
-    table { width: 100%; border-collapse: collapse; text-align: right; background: rgba(18, 24, 38, 0.9); border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.08); }
-    th { background: #0f172a; padding: 12px 16px; font-size: 13px; color: #94a3b8; }
-    td { padding: 12px 16px; font-size: 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
-    .key-badge { font-family: monospace; background: rgba(79, 70, 229, 0.15); border: 1px solid rgba(79, 70, 229, 0.3); color: #a5b4fc; padding: 2px 6px; border-radius: 6px; font-weight: 700; user-select: all; }
-    .badge-active { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; padding: 2px 6px; border-radius: 6px; font-size: 12px; }
-    .badge-blocked { background: rgba(239, 68, 68, 0.15); color: #fca5a5; padding: 2px 6px; border-radius: 6px; font-size: 12px; }
-    #loginModal { position: fixed; inset: 0; background: #090d16; display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .login-box { background: rgba(18, 24, 38, 0.95); border: 1px solid rgba(255, 255, 255, 0.12); padding: 32px; border-radius: 12px; width: 100%; max-width: 380px; text-align: center; }
-    .login-box input { width: 100%; margin: 16px 0; padding: 12px; font-size: 16px; text-align: center; }
-    .login-box .btn { width: 100%; padding: 12px; font-size: 16px; }
+    body { background: var(--bg); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; background-image: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%), radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.06) 0%, transparent 40%); }
+    header { background: rgba(11, 15, 25, 0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--card-border); padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .brand-crown { font-size: 28px; filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.6)); }
+    .brand-title { font-size: 20px; font-weight: 900; letter-spacing: -0.5px; }
+    .brand-badge { background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
+    .server-status-pill { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 999px; font-size: 12.5px; color: #6ee7b7; font-weight: 700; }
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 10px #10b981; animation: pulse 1.8s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
+    .btn { padding: 9px 18px; border-radius: 10px; font-weight: 700; font-size: 13.5px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); display: inline-flex; align-items: center; gap: 6px; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn-gold { background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25); }
+    .btn-gold:hover { filter: brightness(1.1); box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35); }
+    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-color: rgba(239, 68, 68, 0.35); }
+    .btn-danger:hover { background: #ef4444; color: white; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4); }
+    .btn-secondary { background: rgba(255, 255, 255, 0.05); color: var(--text-main); border-color: var(--card-border); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
+    .btn-success { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.35); }
+    .btn-success:hover { background: #10b981; color: white; }
+    .container { max-width: 1380px; width: 100%; margin: 0 auto; padding: 24px; flex: 1; display: flex; flex-direction: column; gap: 24px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+    .stat-card { background: var(--card-bg); backdrop-filter: blur(16px); border: 1px solid var(--card-border); border-radius: 16px; padding: 20px; position: relative; overflow: hidden; }
+    .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--card-border), transparent); }
+    .stat-title { font-size: 13px; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+    .stat-value { font-size: 30px; font-weight: 900; letter-spacing: -0.5px; }
+    .stat-icon { font-size: 22px; opacity: 0.8; }
+    .card { background: var(--card-bg); backdrop-filter: blur(16px); border: 1px solid var(--card-border); border-radius: 16px; padding: 22px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 12px; }
+    .card-title { font-size: 16.5px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) auto; gap: 12px; align-items: flex-end; }
+    .field-group { display: flex; flex-direction: column; gap: 6px; }
+    .field-label { font-size: 12px; color: var(--text-muted); font-weight: 700; }
+    input, select { background: rgba(11, 15, 25, 0.95); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; padding: 10px 14px; color: white; font-size: 13.5px; outline: none; transition: border-color 0.2s; }
+    input:focus, select:focus { border-color: var(--accent-gold); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
+    .table-container { border-radius: 14px; overflow: hidden; border: 1px solid var(--card-border); background: rgba(11, 15, 25, 0.6); }
+    table { width: 100%; border-collapse: collapse; text-align: right; }
+    th { background: rgba(15, 23, 42, 0.95); padding: 14px 18px; font-size: 12.5px; color: var(--text-muted); font-weight: 800; border-bottom: 1px solid var(--card-border); }
+    td { padding: 14px 18px; font-size: 13.5px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); vertical-align: middle; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+    .key-badge { font-family: monospace; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35); color: #c7d2fe; padding: 4px 10px; border-radius: 8px; font-weight: 800; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; user-select: all; }
+    .client-tag { font-weight: 800; color: #fff; display: flex; align-items: center; gap: 6px; }
+    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+    .status-badge.active { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .status-badge.blocked { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .device-box { background: rgba(18, 24, 38, 0.8); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 10px; padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .device-model-title { font-weight: 800; color: #e2e8f0; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .device-sub { font-size: 11.5px; color: var(--text-muted); }
+    .device-badge-empty { color: var(--text-muted); font-size: 12.5px; font-style: italic; }
+    .filter-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .login-card { background: #0c101c; border: 1px solid rgba(245, 158, 11, 0.3); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7); padding: 36px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; }
+    .copy-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 14px; transition: color 0.2s; }
+    .copy-btn:hover { color: white; }
+    .time-badge { font-family: monospace; font-size: 12.5px; color: var(--text-muted); background: rgba(255, 255, 255, 0.04); padding: 4px 10px; border-radius: 6px; }
   </style>
 </head>
 <body>
 
-<div id="loginModal">
-  <div class="login-box">
-    <div style="font-size: 44px; margin-bottom: 8px;">👑</div>
-    <h2 style="font-weight: 800; margin-bottom: 4px;">لوحة تحكم عبدالإله</h2>
-    <p style="color: #94a3b8; font-size: 14px;">أدخل كلمة المرور للمتابعة</p>
-    <div id="loginError" style="display:none; color:#fca5a5; background:rgba(239,68,68,0.15); padding:8px; border-radius:8px; margin-top:10px; font-size:13px;"></div>
-    <input type="password" id="adminPassInput" placeholder="أدخل كلمة المرور">
-    <button class="btn btn-primary" id="loginSubmitBtn">تسجيل الدخول ⚡</button>
-  </div>
-</div>
-
-<header>
-  <div class="brand"><span>👑</span><span>لوحة تحكم عبدالإله</span><span class="brand-badge">إصدار V5</span></div>
-  <div style="display:flex; gap:8px;">
-    <button class="btn btn-danger btn-sm" id="btnPurge">🚨 قفل وتصفير شامل</button>
-    <button class="btn btn-secondary btn-sm" id="btnLogout">خروج</button>
-  </div>
-</header>
-
-<div class="container">
-  <div class="stats-grid">
-    <div class="stat-card"><div class="stat-title">إجمالي الأكواد</div><div class="stat-value" id="statTotalKeys">39</div></div>
-    <div class="stat-card"><div class="stat-title">الأكواد النشطة</div><div class="stat-value" style="color:#10b981;" id="statApproved">0</div></div>
-    <div class="stat-card"><div class="stat-title">المحظورة / المقفلة</div><div class="stat-value" style="color:#ef4444;" id="statBlocked">39</div></div>
-    <div class="stat-card"><div class="stat-title">حالة السحابة</div><div class="stat-value" style="font-size:18px; margin-top:6px;" id="statCloud">فحص...</div></div>
-  </div>
-
-  <div class="control-panel">
-    <div class="form-group">
-      <input type="text" id="newOwnerName" placeholder="اسم صاحب الكود">
-      <select id="newDuration">
-        <option value="30">30 يوم (شهر)</option>
-        <option value="60">60 يوم (شهرين)</option>
-        <option value="90">90 يوم (3 أشهر)</option>
-        <option value="365">سنة كاملة</option>
-        <option value="3650">دائم مدى الحياة</option>
-      </select>
-      <select id="newMaxDevices">
-        <option value="1">جهاز واحد</option>
-        <option value="2">جهازين</option>
-        <option value="5">5 أجهزة</option>
-        <option value="16">16 جهاز (أسطول)</option>
-      </select>
-      <button class="btn btn-primary" id="btnGenerate">⚡ توليد كود</button>
-    </div>
-    <div class="form-group">
-      <input type="text" id="searchInput" placeholder="بحث...">
-      <button class="btn btn-secondary" id="btnRefresh">🔄 تحديث</button>
-    </div>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>الكود</th><th>صاحب الكود</th><th>الحالة</th><th>الصلاحية</th><th>الأجهزة</th><th>الإجراءات</th>
-      </tr>
-    </thead>
-    <tbody id="keysTableBody">
-      <tr><td colspan="6" style="text-align:center; color:#94a3b8; padding:30px;">جاري التحميل...</td></tr>
-    </tbody>
-  </table>
-</div>
-
-<script>
-(function() {
-  var token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || '';
-  var urlParams = new URLSearchParams(window.location.search);
-  var urlPass = urlParams.get('pass') || urlParams.get('token');
-  if (urlPass) {
-    token = urlPass.trim();
-    sessionStorage.setItem('adminToken', token);
-    localStorage.setItem('adminToken', token);
-  }
-
-  var allKeys = [];
-
-  function req(url, options) {
-    options = options || {};
-    options.headers = options.headers || {};
-    options.headers['Authorization'] = 'Bearer ' + token;
-    return fetch(url, options);
-  }
-
-  function loadData(cb) {
-    req('/api/admin/keys')
-    .then(function(res) {
-      if (!res.ok) throw new Error('Auth error');
-      return res.json();
-    })
-    .then(function(data) {
-      allKeys = data.keys || [];
-      document.getElementById('statTotalKeys').innerText = (data.stats && data.stats.total_keys) || 0;
-      document.getElementById('statApproved').innerText = (data.stats && data.stats.approved) || 0;
-      document.getElementById('statBlocked').innerText = (data.stats && data.stats.blocked) || 0;
-      document.getElementById('statCloud').innerHTML = data.cloud_active ? '<span style="color:#10b981">✅ متصلة</span>' : '<span style="color:#94a3b8">محلي</span>';
-      render();
-      if (cb) cb(true);
-    })
-    .catch(function() {
-      if (cb) cb(false);
-    });
-  }
-
-  function render() {
-    var tbody = document.getElementById('keysTableBody');
-    var q = (document.getElementById('searchInput').value || '').trim().toLowerCase();
-    var list = allKeys.filter(function(k) {
-      if (!q) return true;
-      return (k.key && k.key.toLowerCase().indexOf(q) !== -1) || (k.owner && k.owner.toLowerCase().indexOf(q) !== -1);
-    });
-
-    if (list.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8; padding:35px;">لا توجد أي أكواد مسجلة (النظام مصفّر بالكامل ومغلق على الجميع ✅)</td></tr>';
-      return;
-    }
-
-    var h = '';
-    for (var i = 0; i < list.length; i++) {
-      var k = list[i];
-      var isBlock = (k.status === 'blocked' || k.active === false);
-      var exp = k.expiresAt ? new Date(k.expiresAt).toLocaleDateString('ar-SA') : 'ملغي / محظور';
-      var devCount = (k.devices && k.devices.length) ? (k.devices.length + ' جهاز') : 'لا يوجد';
-      h += '<tr>' +
-        '<td><span class="key-badge">' + k.key + '</span></td>' +
-        '<td><strong>' + (k.owner || 'محظور') + '</strong></td>' +
-        '<td>' + (isBlock ? '<span class="badge-blocked">محظور 🛑</span>' : '<span class="badge-active">نشط ✅</span>') + '</td>' +
-        '<td>' + exp + '</td>' +
-        '<td>' + devCount + '</td>' +
-        '<td><div style="display:flex; gap:6px;">' +
-          '<button class="btn btn-secondary btn-sm act-toggle" data-key="' + k.key + '">' + (isBlock ? 'تفعيل' : 'حظر') + '</button>' +
-          '<button class="btn btn-secondary btn-sm act-reset" data-key="' + k.key + '">🔄 تصفير</button>' +
-          '<button class="btn btn-danger btn-sm act-del" data-key="' + k.key + '">🗑️ حذف</button>' +
-        '</div></td>' +
-      '</tr>';
-    }
-    tbody.innerHTML = h;
-  }
-
-  function doLogin() {
-    var p = (document.getElementById('adminPassInput').value || '').trim();
-    var err = document.getElementById('loginError');
-    var btn = document.getElementById('loginSubmitBtn');
-    err.style.display = 'none';
-
-    if (!p) {
-      err.innerText = 'يرجى إدخال كلمة المرور';
-      err.style.display = 'block';
-      return;
-    }
-
-    btn.innerText = 'جاري التحقق...';
-    btn.disabled = true;
-    token = p;
-    sessionStorage.setItem('adminToken', token);
-    localStorage.setItem('adminToken', token);
-
-    loadData(function(ok) {
-      btn.innerText = 'تسجيل الدخول ⚡';
-      btn.disabled = false;
-      if (ok) {
-        document.getElementById('loginModal').style.display = 'none';
-      } else {
-        sessionStorage.removeItem('adminToken');
-        localStorage.removeItem('adminToken');
-        token = '';
-        err.innerText = 'كلمة المرور غير صحيحة!';
-        err.style.display = 'block';
-      }
-    });
-  }
-
-  document.getElementById('loginSubmitBtn').addEventListener('click', doLogin);
-  document.getElementById('adminPassInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
-  document.getElementById('btnRefresh').addEventListener('click', function() { loadData(); });
-  document.getElementById('searchInput').addEventListener('input', render);
-  document.getElementById('btnLogout').addEventListener('click', function() {
-    sessionStorage.removeItem('adminToken');
-    localStorage.removeItem('adminToken');
-    token = '';
-    document.getElementById('loginModal').style.display = 'flex';
-    document.getElementById('adminPassInput').value = '';
-  });
-
-  document.getElementById('btnGenerate').addEventListener('click', function() {
-    var owner = (document.getElementById('newOwnerName').value || '').trim();
-    var duration = document.getElementById('newDuration').value;
-    var maxDevices = document.getElementById('newMaxDevices').value;
-    req('/api/admin/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ owner: owner, durationDays: duration, maxDevices: maxDevices })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.success) {
-        document.getElementById('newOwnerName').value = '';
-        loadData();
-        alert('تم توليد الكود بنجاح: ' + d.key.key);
-      }
-    });
-  });
-
-  document.getElementById('btnPurge').addEventListener('click', function() {
-    var ans = prompt('🚨 تحذير خطير: هذا الخيار سيحذف كافة الأكواد ويقفل الأداة على جميع الناس نهائياً! اكتب (نعم) للتأكيد:');
-    if (ans === 'نعم') {
-      req('/api/admin/purge_all', { method: 'POST' })
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        alert(d.message || 'تم التصفير والقفل الشامل!');
-        loadData();
-      });
-    }
-  });
-
-  document.getElementById('keysTableBody').addEventListener('click', function(e) {
-    var t = e.target;
-    var key = t.getAttribute('data-key');
-    if (!key) return;
-
-    if (t.classList.contains('act-toggle')) {
-      req('/api/admin/toggle_lock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) })
-      .then(function() { loadData(); });
-    } else if (t.classList.contains('act-reset')) {
-      if (confirm('تصفير ارتباط الأجهزة بهذا الكود؟')) {
-        req('/api/admin/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) })
-        .then(function() { loadData(); });
-      }
-    } else if (t.classList.contains('act-del')) {
-      if (confirm('حذف الكود نهائياً وقفل الأداة عند صاحبه؟')) {
-        req('/api/admin/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key }) })
-        .then(function() { loadData(); });
-      }
-    }
-  });
-
-  if (token) {
-    loadData(function(ok) {
-      if (ok) document.getElementById('loginModal').style.display = 'none';
-      else document.getElementById('loginModal').style.display = 'flex';
-    });
-  } else {
-    document.getElementById('loginModal').style.display = 'flex';
-  }
-})();
-</script>
-</body>
-</html>`;
-
-app.get(['/' + ADMIN_PATH, '/abod', '/admin', '/login'], (req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(DASHBOARD_HTML);
-});
-
-app.get('/', (req, res, next) => {
-  if (req.headers.accept && req.headers.accept.includes('text/html')) {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.send(DASHBOARD_HTML);
-  }
-  next();
-});
-
-app.all('/api/*', (req, res) => sendUniversalLockdown(res));
-app.post('*', (req, res) => sendUniversalLockdown(res));
-
-app.use((req, res) => {
-  res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;"><h1>404 Not Found</h1><p>The requested URL ' + req.originalUrl + ' was not found on this server.</p><hr><address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server</address></body></html>');
-});
-
-const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || 'https://yalla-upd0.onrender.com/api/health';
-setInterval(() => {
-  try { https.get(KEEP_ALIVE_URL, () => {}).on('error', () => {}); } catch (e) {}
-}, 3.5 * 60 * 1000);
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log('Server running securely on port ' + PORT);
-});
+<div id="loginModal" class="modal-overlay">
+  <div class="login-card">
+    <div style="font-size: 52px; margin-bottom: 10px;">👑</div>
