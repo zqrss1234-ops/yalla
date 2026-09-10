@@ -1,36 +1,33 @@
 const express = require('express');
-const cors = require('cors');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
 const app = express();
-app.set('trust proxy', true);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ==========================================
-// 🛡️ هيدرز منع الكاش نهائياً (Anti-Caching)
-// ==========================================
 app.use((req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.setHeader('Surrogate-Control', 'no-store');
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key, x-hwid, x-device-id");
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
   next();
 });
 
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
 // ==========================================
-// 🔑 كلمة المرور للوحة التحكم (حصراً abod2026)
+// ⚙️ الإعدادات والمفاتيح الأساسية
 // ==========================================
-const ADMIN_TOKEN = "abod2026";
-const ADMIN_PATH = process.env.ADMIN_PATH || "abod-master-7788";
-const JWT_SECRET_SALT = process.env.JWT_SECRET || "ABOD_V4_SECURE_SALT_998877665544332211";
+const CURRENT_EPOCH = "V4_ABOD_HARD_RESET_2026";
+const ADMIN_PATH = "abod-master-7788";
+const ADMIN_TOKEN = "12Qwaszx@@";
+const JWT_SECRET_SALT = process.env.JWT_SECRET || "ABOD_V4_SECURE_HMAC_SECRET_2026_MASTER";
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || "";
 
 const DB_FILE = path.join(__dirname, 'database.json');
-const CURRENT_EPOCH = "V4_ABOD_HARD_RESET_2026";
 const INITIAL_KEYS = [];
 
 // ==========================================
@@ -75,65 +72,65 @@ function saveLocalDB(data) {
 
 memoryDB = loadLocalFileDB();
 
-async function initMongoCloud() {
-  const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
-  if (!mongoUri) return;
-  try {
-    let MongoClient;
-    try { MongoClient = require('mongodb').MongoClient; } catch (e) { return; }
-    const client = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 6000 });
-    await client.connect();
-    const db = client.db('yalla_suite');
-    mongoCollection = db.collection('license_database');
-    isMongoActive = true;
-    console.log("✅ Successfully connected to MongoDB Atlas Cloud Database!");
+if (MONGO_URI) {
+  (async () => {
+    try {
+      const { MongoClient } = require('mongodb');
+      const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 5000 });
+      await client.connect();
+      const db = client.db('yallasniper_cloud');
+      mongoCollection = db.collection('system_state');
+      isMongoActive = true;
+      console.log("✅ [MONGODB ATLAS] متصل بنجاح بالسحابة الدائمة!");
 
-    const remoteDoc = await mongoCollection.findOne({ _id: 'master_license_store' });
-    if (remoteDoc) {
-      if (remoteDoc.epoch !== CURRENT_EPOCH) {
-        console.log("🚨 [MONGO V4 HARD RESET] تصفير قاعدة بيانات MongoDB كلياً وقفل كل النسخ القديمة نهائياً!");
+      const remoteDoc = await mongoCollection.findOne({ _id: 'master_license_store' });
+      if (remoteDoc) {
+        if (remoteDoc.epoch !== CURRENT_EPOCH) {
+          console.log("🚨 [MONGO V4 PURGE] تصفير السحابة نهائياً!");
+          await mongoCollection.updateOne(
+            { _id: 'master_license_store' },
+            { $set: { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
+            { upsert: true }
+          );
+          memoryDB = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+        } else {
+          console.log(`📥 [MONGO SYNC] تم تحميل ${remoteDoc.keys ? remoteDoc.keys.length : 0} كود من السحابة`);
+          memoryDB = { epoch: CURRENT_EPOCH, keys: remoteDoc.keys, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+        }
+      } else {
         await mongoCollection.updateOne(
           { _id: 'master_license_store' },
-          { $set: { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
+          { $set: { _id: 'master_license_store', epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
           { upsert: true }
         );
-        memoryDB = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
-        saveLocalDB(memoryDB);
-      } else if (Array.isArray(remoteDoc.keys)) {
-        memoryDB = { epoch: CURRENT_EPOCH, keys: remoteDoc.keys, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
-        saveLocalDB(memoryDB);
       }
-    } else {
-      await mongoCollection.updateOne(
-        { _id: 'master_license_store' },
-        { $set: { _id: 'master_license_store', epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
-        { upsert: true }
-      );
+      saveLocalDB(memoryDB);
+    } catch (err) {
+      console.warn("⚠️ [MONGO] تعذر الاتصال بـ MongoDB. الاعتماد على التخزين المحلي:", err.message);
+      isMongoActive = false;
     }
-  } catch (err) {
-    console.error("⚠️ MongoDB connection error:", err.message);
-    isMongoActive = false;
-  }
+  })();
 }
 
-function loadDB() {
-  return memoryDB;
-}
-
-function saveDB(data) {
+async function persistDB(data) {
   memoryDB = data;
   saveLocalDB(data);
   if (isMongoActive && mongoCollection) {
-    mongoCollection.updateOne(
-      { _id: 'master_license_store' },
-      { $set: { keys: data.keys, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
-      { upsert: true }
-    ).catch(err => console.error("[MONGO SAVE ERROR]", err.message));
+    try {
+      await mongoCollection.updateOne(
+        { _id: 'master_license_store' },
+        { $set: { keys: data.keys, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
+        { upsert: true }
+      );
+    } catch (e) {
+      console.error("[MONGO WRITE ERROR]", e.message);
+    }
   }
 }
 
-initMongoCloud();
-
+// ==========================================
+// 🔒 دالة الرفض والإغلاق الشامل لكافة الأجهزة غير المصرح بها
+// ==========================================
 function buildLockedResponse(msg) {
   return {
     status: "blocked",
@@ -152,14 +149,16 @@ function buildLockedResponse(msg) {
   };
 }
 
-function normalizeToken(str) {
-  if (!str) return '';
-  return String(str)
-    .trim()
-    .toLowerCase()
-    .replace(/[\u0660-\u0669]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x0660 + 48))
-    .replace(/[\u06F0-\u06F9]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x06F0 + 48))
-    .replace(/[-\s_]/g, '');
+function checkAdminPassword(input) {
+  if (!input) return false;
+  const str = String(input).trim();
+  if (str === "12Qwaszx@@" || str === "abod2026") return true;
+  if (str.toLowerCase() === "12qwaszx@@" || str.toLowerCase() === "abod2026") return true;
+  const norm = str.replace(/[\u0660-\u0669]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x0660 + 48))
+                  .replace(/[\u06F0-\u06F9]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x06F0 + 48));
+  if (norm === "12Qwaszx@@" || norm.toLowerCase() === "12qwaszx@@") return true;
+  if (norm === "abod2026" || norm.toLowerCase() === "abod2026") return true;
+  return false;
 }
 
 function requireAdminAuth(req, res, next) {
@@ -174,195 +173,177 @@ function requireAdminAuth(req, res, next) {
     token = String(req.body.token || req.body.pass || req.body.password).trim();
   }
 
-  const norm = normalizeToken(token);
-  // قبول كلمة المرور abod2026 بكافة أشكالها (حروف كبيرة، صغيرة، أرقام عربية، مسافات)
-  if (norm === "abod2026" || token === ADMIN_TOKEN || token === (process.env.ADMIN_TOKEN || "").trim()) {
+  if (checkAdminPassword(token) || token === ADMIN_TOKEN || token === (process.env.ADMIN_TOKEN || "").trim()) {
     return next();
   }
 
-  return res.status(403).json({ success: false, message: "🚫 غير مصرح لك بالدخول" });
+  return res.status(403).json({
+    success: false,
+    error: "UNAUTHORIZED_ADMIN_ACCESS",
+    message: "🚫 كلمة مرور لوحة التحكم غير صحيحة"
+  });
 }
 
-function extractRequestParams(req) {
-  const body = req.body || {};
-  const query = req.query || {};
+function extractDevicePayload(req) {
+  const b = req.body || {};
+  const q = req.query || {};
+  const h = req.headers || {};
 
-  const key = body.key || body.license_key || body.licenseKey || query.key || query.license_key || query.licenseKey;
-  const deviceId = body.deviceId || body.device_id || body.udid || body.hwid || query.deviceId || query.device_id || query.udid || query.hwid;
-  const deviceName = body.deviceName || body.device_name || query.deviceName || query.device_name || "Unknown Device";
-  const deviceModel = body.deviceModel || body.device_model || query.deviceModel || query.device_model || "iOS Device";
-  const iosVersion = body.iosVersion || body.ios_version || query.iosVersion || query.ios_version || "";
-  const bundleId = body.bundleId || body.bundle_id || query.bundleId || query.bundle_id || "";
+  const key = (b.key || b.license || b.licenseKey || b.token || q.key || q.token || "").trim();
+  const deviceId = (b.deviceId || b.deviceUUID || b.uuid || b.hwid || b.hardwareId ||
+                    q.deviceId || q.deviceUUID || q.uuid || q.hwid ||
+                    h['x-hwid'] || h['x-device-id'] || "").trim();
+  const deviceName = (b.deviceName || b.name || q.deviceName || "").trim();
+  const deviceModel = (b.deviceModel || b.model || q.deviceModel || "").trim();
+  const iosVersion = (b.iosVersion || b.version || q.iosVersion || "").trim();
+  const bundleId = (b.bundleId || b.bundle || q.bundleId || "").trim();
 
   return { key, deviceId, deviceName, deviceModel, iosVersion, bundleId };
 }
 
-function generateNewKeyString() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const segment = () => {
-    let s = "";
-    for (let i = 0; i < 4; i++) {
-      s += chars.charAt(Math.floor(Math.random() * chars.length));
+// ==========================================
+// 📡 معالجة مسارات التحقق للأجهزة
+// ==========================================
+async function handleCheckDevice(req, res) {
+  const { deviceId, deviceName, deviceModel, iosVersion, bundleId } = extractDevicePayload(req);
+
+  if (!deviceId) {
+    return res.json(buildLockedResponse("معرف الجهاز غير صالح"));
+  }
+
+  const db = memoryDB;
+  let boundKey = null;
+
+  for (const k of db.keys) {
+    if (k.devices && Array.isArray(k.devices)) {
+      const dev = k.devices.find(d => d.deviceId === deviceId);
+      if (dev) {
+        boundKey = { keyObj: k, devObj: dev };
+        break;
+      }
     }
-    return s;
-  };
-  return 'ABOD-' + segment() + '-' + segment() + '-' + segment();
-}
-
-// -------------------------------------------------------------
-// معالج تفعيل الأكواد الصارم (Validate Key Handler)
-// -------------------------------------------------------------
-function handleValidate(req, res) {
-  const { key, deviceId, deviceName, deviceModel, iosVersion, bundleId } = extractRequestParams(req);
-
-  if (!key || !deviceId) {
-    return res.json(buildLockedResponse("Key Expired or Invalid"));
   }
 
-  const cleanKey = String(key).trim().toUpperCase();
-
-  if (!cleanKey.startsWith('ABOD-')) {
-    return res.json(buildLockedResponse("Key Expired or Invalid"));
+  if (!boundKey) {
+    return res.json(buildLockedResponse("الجهاز غير مسجل أو محذوف من النظام"));
   }
 
-  const db = loadDB();
-  const keyObj = (db.keys || []).find(k => k.key && k.key.trim().toUpperCase() === cleanKey);
+  const { keyObj, devObj } = boundKey;
 
-  if (!keyObj) {
-    return res.json(buildLockedResponse("Key Expired or Invalid"));
+  if (keyObj.status === 'blocked' || keyObj.active === false) {
+    return res.json(buildLockedResponse("🚫 هذا الكود محظور بالكامل من الإدارة"));
   }
 
-  // إذا تم قفل الكود من الإدارة يدوياً
-  if (keyObj.status === 'blocked') {
-    return res.json(buildLockedResponse("🚫 تم إيقاف وقفل هذا الكود نهائياً من الإدارة"));
+  if (devObj.status === 'blocked' || devObj.approved === false) {
+    return res.json(buildLockedResponse("🚫 تم قفل هذا الجهاز بشكل خاص من الإدارة"));
   }
 
-  if (!keyObj.activations) {
-    keyObj.activations = [];
-  }
-
-  let thisDevice = keyObj.activations.find(a => a.device_id === deviceId);
-
-  if (thisDevice) {
-    if (thisDevice.status === 'rejected' || thisDevice.status === 'blocked') {
-      return res.json(buildLockedResponse("🚫 تم قفل الأداة عن هذا الجهاز من قِبل الإدارة"));
+  if (keyObj.expiresAt) {
+    const exp = new Date(keyObj.expiresAt).getTime();
+    if (!isNaN(exp) && Date.now() > exp) {
+      return res.json(buildLockedResponse("⌛ انتهت صلاحية الكود"));
     }
-    
-    if (thisDevice.status === 'approved') {
-      thisDevice.last_seen = new Date().toISOString();
-      thisDevice.device_name = deviceName;
-      thisDevice.device_model = deviceModel;
-      thisDevice.ios_version = iosVersion;
-      saveDB(db);
-      return res.json({ 
-        valid: true, 
-        approved: true, 
-        active: true, 
-        success: true, 
-        allowed: true, 
-        licensed: true, 
-        status: "approved", 
-        key: cleanKey, 
-        owner_name: keyObj.owner_name || "",
-        message: "✅ تم التحقق وتفعيل الجهاز بنجاح" 
-      });
-    }
-
-    return res.json({ 
-      valid: false, 
-      approved: false, 
-      active: false, 
-      success: false, 
-      needs_approval: true, 
-      needsApproval: true, 
-      status: "pending", 
-      message: "⏳ بانتظار الموافقة على جهازك من لوحة التحكم" 
-    });
   }
 
-  // ربط الكود بجهاز واحد فقط
-  const approvedOnOtherDevice = keyObj.activations.find(a => a.status === 'approved' && a.device_id !== deviceId);
-  if (approvedOnOtherDevice) {
-    return res.json(buildLockedResponse("⚠️ هذا الكود مفعّل لجهاز آخر بالفعل ولا يمكن استخدامه على هذا الجهاز!"));
-  }
+  devObj.lastSeen = new Date().toISOString();
+  if (deviceName) devObj.deviceName = deviceName;
+  if (deviceModel) devObj.deviceModel = deviceModel;
+  if (iosVersion) devObj.iosVersion = iosVersion;
+  if (bundleId) devObj.bundleId = bundleId;
+  persistDB(db);
 
-  const newActivation = {
-    device_id: deviceId,
-    device_name: deviceName,
-    device_model: deviceModel,
-    ios_version: iosVersion,
-    bundle_id: bundleId,
-    status: 'approved',
-    requested_at: new Date().toISOString(),
-    approved_at: new Date().toISOString(),
-    last_seen: new Date().toISOString()
-  };
-
-  keyObj.activations.push(newActivation);
-  saveDB(db);
-
-  return res.json({ 
-    valid: true, 
-    approved: true, 
-    active: true, 
-    success: true, 
-    allowed: true, 
-    licensed: true, 
-    status: "approved", 
-    key: cleanKey, 
-    owner_name: keyObj.owner_name || "",
-    message: "👑 تم تفعيل وحفظ جهازك بنجاح!" 
+  return res.json({
+    status: "approved",
+    message: "تم تفعيل الجهاز بنجاح",
+    valid: true,
+    approved: true,
+    active: true,
+    success: true,
+    allowed: true,
+    licensed: true,
+    code: 200,
+    key: keyObj.key,
+    owner: keyObj.owner || "مستخدم",
+    device_status: "approved",
+    needs_approval: false,
+    needsApproval: false
   });
 }
 
-// -------------------------------------------------------------
-// معالج فحص النسخ المكررة والفرعية (Check Device Handler)
-// -------------------------------------------------------------
-function handleCheckDevice(req, res) {
-  const { deviceId, deviceName, deviceModel, iosVersion } = extractRequestParams(req);
+async function handleValidate(req, res) {
+  const { key, deviceId, deviceName, deviceModel, iosVersion, bundleId } = extractDevicePayload(req);
 
-  if (!deviceId) {
-    return res.json(buildLockedResponse("Key Expired or Invalid"));
+  if (!key) {
+    return res.json(buildLockedResponse("لم يتم إرسال كود التفعيل"));
   }
 
-  const db = loadDB();
-  for (const k of (db.keys || [])) {
-    if (k.status === 'blocked') continue;
-    const act = (k.activations || []).find(a => a.device_id === deviceId);
-    if (act) {
-      if (act.status === 'blocked' || act.status === 'rejected') {
-        return res.json(buildLockedResponse("🚫 تم قفل الأداة عن هذا الجهاز"));
-      }
-      if (act.status === 'approved') {
-        act.last_seen = new Date().toISOString();
-        act.device_name = deviceName;
-        act.device_model = deviceModel;
-        act.ios_version = iosVersion;
-        saveDB(db);
-        return res.json({ 
-          valid: true, 
-          approved: true, 
-          active: true, 
-          success: true, 
-          allowed: true, 
-          licensed: true, 
-          status: "approved", 
-          key: k.key, 
-          owner_name: k.owner_name || "",
-          message: "👑 تم تفعيل النسخة المكررة تلقائياً بنجاح!" 
-        });
-      }
-      if (act.status === 'pending') {
-        return res.json({ 
-          valid: false, 
-          approved: false, 
-          needs_approval: true, 
-          needsApproval: true, 
-          status: "pending", 
-          message: "⏳ بانتظار الموافقة" 
-        });
-      }
+  const db = memoryDB;
+  const keyObj = db.keys.find(k => k.key.toUpperCase() === key.toUpperCase());
+
+  if (!keyObj) {
+    return res.json(buildLockedResponse("🚫 الكود غير مسجل في النظام نهائياً"));
+  }
+
+  if (keyObj.status === 'blocked' || keyObj.active === false) {
+    return res.json(buildLockedResponse("🚫 هذا الكود ملغي ومحظور من الإدارة"));
+  }
+
+  if (keyObj.expiresAt) {
+    const exp = new Date(keyObj.expiresAt).getTime();
+    if (!isNaN(exp) && Date.now() > exp) {
+      return res.json(buildLockedResponse("⌛ انتهت صلاحية هذا الكود"));
     }
+  }
+
+  if (deviceId) {
+    if (!keyObj.devices) keyObj.devices = [];
+    let devObj = keyObj.devices.find(d => d.deviceId === deviceId);
+
+    if (devObj) {
+      if (devObj.status === 'blocked' || devObj.approved === false) {
+        return res.json(buildLockedResponse("🚫 هذا الجهاز مقفل من الإدارة"));
+      }
+      devObj.lastSeen = new Date().toISOString();
+      if (deviceName) devObj.deviceName = deviceName;
+      if (deviceModel) devObj.deviceModel = deviceModel;
+      if (iosVersion) devObj.iosVersion = iosVersion;
+      if (bundleId) devObj.bundleId = bundleId;
+    } else {
+      const maxSlots = keyObj.maxDevices || 1;
+      if (keyObj.devices.length >= maxSlots) {
+        return res.json(buildLockedResponse(`تجاوزت الحد المسموح للأجهزة (${maxSlots} جهاز)`));
+      }
+      devObj = {
+        deviceId,
+        deviceName: deviceName || "iPhone",
+        deviceModel: deviceModel || "Apple Device",
+        iosVersion: iosVersion || "iOS",
+        bundleId: bundleId || "com.yalla.lite",
+        status: "approved",
+        approved: true,
+        firstActivated: new Date().toISOString(),
+        lastSeen: new Date().toISOString()
+      };
+      keyObj.devices.push(devObj);
+    }
+
+    persistDB(db);
+
+    return res.json({
+      status: "approved",
+      message: "تم تفعيل الكود بنجاح",
+      valid: true,
+      approved: true,
+      active: true,
+      success: true,
+      allowed: true,
+      licensed: true,
+      code: 200,
+      key: keyObj.key,
+      owner: keyObj.owner || "مستخدم",
+      expiresAt: keyObj.expiresAt || null,
+      device: devObj
+    });
   }
 
   return res.json(buildLockedResponse("Key Expired or Invalid"));
@@ -395,37 +376,44 @@ checkDeviceRoutes.forEach(r => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: "alive", time: Date.now(), cloud: isMongoActive, epoch: CURRENT_EPOCH });
+  res.json({
+    status: "online",
+    epoch: memoryDB.epoch,
+    cloud_active: isMongoActive,
+    total_keys: memoryDB.keys ? memoryDB.keys.length : 0
+  });
 });
 
-// -------------------------------------------------------------
-// Admin APIs: إدارة وتوليد وقفل الأكواد
-// -------------------------------------------------------------
 app.get('/api/admin/keys', requireAdminAuth, (req, res) => {
-  const db = loadDB();
-  const keys = db.keys || [];
-  
+  const db = memoryDB;
+  let totalKeys = db.keys.length;
   let approvedCount = 0;
-  let pendingCount = 0;
   let blockedCount = 0;
-  
-  keys.forEach(k => {
-    if (k.status === 'blocked') blockedCount++;
-    (k.activations || []).forEach(a => {
-      if (a.status === 'approved') approvedCount++;
-      else if (a.status === 'pending') pendingCount++;
-      else if (a.status === 'blocked' || a.status === 'rejected') blockedCount++;
-    });
+  let pendingCount = 0;
+
+  db.keys.forEach(k => {
+    if (k.status === 'blocked' || k.active === false) {
+      blockedCount++;
+    } else {
+      approvedCount++;
+    }
+    if (k.devices && Array.isArray(k.devices)) {
+      k.devices.forEach(d => {
+        if (d.status === 'blocked' || d.approved === false) {
+          blockedCount++;
+        }
+      });
+    }
   });
 
-  res.json({
+  return res.json({
     success: true,
-    keys: keys,
+    keys: db.keys,
     pendingCount: pendingCount,
     cloud_active: isMongoActive,
-    epoch: CURRENT_EPOCH,
+    epoch: db.epoch,
     stats: {
-      total_keys: keys.length,
+      total_keys: totalKeys,
       approved: approvedCount,
       pending: pendingCount,
       blocked: blockedCount
@@ -433,123 +421,136 @@ app.get('/api/admin/keys', requireAdminAuth, (req, res) => {
   });
 });
 
-app.post('/api/admin/generate', requireAdminAuth, (req, res) => {
-  const { count, owner_name, note } = req.body;
-  const num = Math.min(Math.max(parseInt(count) || 1, 1), 100);
-  const db = loadDB();
-  const newKeys = [];
+app.post('/api/admin/generate', requireAdminAuth, async (req, res) => {
+  const { owner, durationDays, maxDevices } = req.body;
+  const days = parseInt(durationDays) || 30;
+  const slots = parseInt(maxDevices) || 1;
+  const ownerName = (owner || "مستخدم جديد").trim();
 
-  for (let i = 0; i < num; i++) {
-    const key = generateNewKeyString();
-    const keyItem = {
-      key: key,
-      owner_name: (owner_name || "").trim() || "غير مسجل",
-      note: note || "",
-      status: 'active',
-      created_at: new Date().toISOString(),
-      activations: []
-    };
-    db.keys.push(keyItem);
-    newKeys.push(keyItem);
-  }
+  const randHex = crypto.randomBytes(3).toString('hex').toUpperCase();
+  const randNum = Math.floor(1000 + Math.random() * 9000);
+  const key = `ABOD-${randHex}-${randNum}`;
 
-  saveDB(db);
-  res.json({ success: true, keys: newKeys, count: newKeys.length });
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+
+  const newKeyObj = {
+    key,
+    owner: ownerName,
+    status: "active",
+    active: true,
+    createdAt: now.toISOString(),
+    expiresAt,
+    durationDays: days,
+    maxDevices: slots,
+    devices: []
+  };
+
+  const db = memoryDB;
+  db.keys.unshift(newKeyObj);
+  await persistDB(db);
+
+  return res.json({ success: true, key: newKeyObj });
 });
 
-app.post('/api/admin/edit_owner', requireAdminAuth, (req, res) => {
-  const { key, owner_name, note } = req.body;
-  const db = loadDB();
-  const keyObj = (db.keys || []).find(k => k.key === key);
-  if (keyObj) {
-    if (owner_name !== undefined) keyObj.owner_name = owner_name.trim();
-    if (note !== undefined) keyObj.note = note;
-    saveDB(db);
-    return res.json({ success: true, message: "تم تحديث اسم صاحب الكود بنجاح" });
-  }
-  res.status(404).json({ success: false, message: "الكود غير موجود" });
+app.post('/api/admin/edit_owner', requireAdminAuth, async (req, res) => {
+  const { key, newOwner } = req.body;
+  if (!key || !newOwner) return res.status(400).json({ success: false, message: "بيانات ناقصة" });
+
+  const db = memoryDB;
+  const k = db.keys.find(x => x.key.toUpperCase() === key.toUpperCase());
+  if (!k) return res.status(404).json({ success: false, message: "الكود غير موجود" });
+
+  k.owner = String(newOwner).trim();
+  await persistDB(db);
+  return res.json({ success: true, key: k });
 });
 
-// قفل / فتح الأداة للكود كاملاً (Kill Switch)
-app.post('/api/admin/toggle_lock', requireAdminAuth, (req, res) => {
+app.post('/api/admin/toggle_lock', requireAdminAuth, async (req, res) => {
   const { key } = req.body;
-  const db = loadDB();
-  const keyObj = (db.keys || []).find(k => k.key === key);
-  if (keyObj) {
-    keyObj.status = (keyObj.status === 'blocked') ? 'active' : 'blocked';
-    if (keyObj.activations) {
-      keyObj.activations.forEach(a => {
-        a.status = (keyObj.status === 'blocked') ? 'blocked' : 'approved';
-      });
-    }
-    saveDB(db);
-    return res.json({ 
-      success: true, 
-      status: keyObj.status, 
-      message: keyObj.status === 'blocked' ? "🚨 تم قفل الأداة عن هذا الكود وجميع أجهزته فوراً" : "✅ تم إعادة تفعيل الأداة لهذا الكود" 
-    });
+  if (!key) return res.status(400).json({ success: false, message: "الكود مطلوب" });
+
+  const db = memoryDB;
+  const k = db.keys.find(x => x.key.toUpperCase() === key.toUpperCase());
+  if (!k) return res.status(404).json({ success: false, message: "الكود غير موجود" });
+
+  if (k.status === 'blocked' || k.active === false) {
+    k.status = 'active';
+    k.active = true;
+  } else {
+    k.status = 'blocked';
+    k.active = false;
   }
-  res.status(404).json({ success: false, message: "الكود غير موجود" });
+
+  await persistDB(db);
+  return res.json({ success: true, key: k });
 });
 
-app.post('/api/admin/approve', requireAdminAuth, (req, res) => {
+app.post('/api/admin/approve', requireAdminAuth, async (req, res) => {
   const { key, deviceId } = req.body;
-  const targetDeviceId = deviceId || req.body.device_id;
-  const db = loadDB();
-  const keyObj = (db.keys || []).find(k => k.key === key);
-  if (keyObj && keyObj.activations) {
-    const act = keyObj.activations.find(a => a.device_id === targetDeviceId);
-    if (act) {
-      act.status = 'approved';
-      act.approved_at = new Date().toISOString();
-      act.last_seen = new Date().toISOString();
-    }
-    saveDB(db);
-  }
-  res.json({ success: true, message: "تم اعتماد وتفعيل الجهاز بنجاح" });
+  if (!key || !deviceId) return res.status(400).json({ success: false, message: "بيانات ناقصة" });
+
+  const db = memoryDB;
+  const k = db.keys.find(x => x.key.toUpperCase() === key.toUpperCase());
+  if (!k) return res.status(404).json({ success: false, message: "الكود غير موجود" });
+
+  const dev = (k.devices || []).find(d => d.deviceId === deviceId);
+  if (!dev) return res.status(404).json({ success: false, message: "الجهاز غير موجود" });
+
+  dev.status = "approved";
+  dev.approved = true;
+  await persistDB(db);
+
+  return res.json({ success: true, device: dev });
 });
 
-app.post('/api/admin/lock_device', requireAdminAuth, (req, res) => {
+app.post('/api/admin/lock_device', requireAdminAuth, async (req, res) => {
   const { key, deviceId } = req.body;
-  const targetDeviceId = deviceId || req.body.device_id;
-  const db = loadDB();
-  const keyObj = (db.keys || []).find(k => k.key === key);
-  if (keyObj && keyObj.activations) {
-    const act = keyObj.activations.find(a => a.device_id === targetDeviceId);
-    if (act) {
-      act.status = (act.status === 'blocked') ? 'approved' : 'blocked';
-    }
-    saveDB(db);
-    return res.json({ success: true, message: act && act.status === 'blocked' ? "تم قفل الجهاز فورياً" : "تم فتح الجهاز" });
-  }
-  res.json({ success: false, message: "الجهاز غير موجود" });
+  if (!key || !deviceId) return res.status(400).json({ success: false, message: "بيانات ناقصة" });
+
+  const db = memoryDB;
+  const k = db.keys.find(x => x.key.toUpperCase() === key.toUpperCase());
+  if (!k) return res.status(404).json({ success: false, message: "الكود غير موجود" });
+
+  const dev = (k.devices || []).find(d => d.deviceId === deviceId);
+  if (!dev) return res.status(404).json({ success: false, message: "الجهاز غير موجود" });
+
+  dev.status = (dev.status === "blocked") ? "approved" : "blocked";
+  dev.approved = (dev.status === "approved");
+  await persistDB(db);
+
+  return res.json({ success: true, device: dev });
 });
 
-app.post('/api/admin/delete', requireAdminAuth, (req, res) => {
+app.post('/api/admin/delete', requireAdminAuth, async (req, res) => {
   const { key } = req.body;
-  const db = loadDB();
-  db.keys = (db.keys || []).filter(k => k.key !== key);
-  saveDB(db);
-  res.json({ success: true, message: "تم حذف الكود نهائياً وإلغاء صلاحيته فوراً" });
+  if (!key) return res.status(400).json({ success: false, message: "الكود مطلوب" });
+
+  const db = memoryDB;
+  db.keys = db.keys.filter(x => x.key.toUpperCase() !== key.toUpperCase());
+  await persistDB(db);
+  return res.json({ success: true, message: "تم حذف الكود وقفل أجهزته نهائياً" });
 });
 
-app.post('/api/admin/reset', requireAdminAuth, (req, res) => {
+app.post('/api/admin/reset', requireAdminAuth, async (req, res) => {
   const { key } = req.body;
-  const db = loadDB();
-  const keyObj = (db.keys || []).find(k => k.key === key);
-  if (keyObj) {
-    keyObj.activations = [];
-    saveDB(db);
-  }
-  res.json({ success: true, message: "تم فك ارتباط الجهاز بنجاح ويمكن استخدامه بجهاز جديد" });
+  if (!key) return res.status(400).json({ success: false, message: "الكود مطلوب" });
+
+  const db = memoryDB;
+  const k = db.keys.find(x => x.key.toUpperCase() === key.toUpperCase());
+  if (!k) return res.status(404).json({ success: false, message: "الكود غير موجود" });
+
+  k.devices = [];
+  await persistDB(db);
+  return res.json({ success: true, message: "تم تصفير ارتباط الأجهزة بنجاح" });
 });
 
 app.post('/api/admin/purge_all', requireAdminAuth, async (req, res) => {
-  const db = loadDB();
+  const db = memoryDB;
   db.keys = [];
-  db.epoch = CURRENT_EPOCH;
-  db.secretSalt = JWT_SECRET_SALT;
-  saveDB(db);
+  db.epoch = "V4_PURGED_" + Date.now();
+  await persistDB(db);
+
   if (isMongoActive && mongoCollection) {
     try {
       await mongoCollection.updateOne(
@@ -557,967 +558,610 @@ app.post('/api/admin/purge_all', requireAdminAuth, async (req, res) => {
         { $set: { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
         { upsert: true }
       );
-    } catch (e) {
-      console.error("[MONGO PURGE ERROR]", e);
-    }
+    } catch (e) {}
   }
-  res.json({ success: true, message: "🚨 تم قفل وتصفير جميع الأكواد بنجاح! جميع النسخ مقفلة الآن." });
+
+  return res.json({
+    success: true,
+    message: "🚨 تم تصفير وقفل جميع الأكواد والأجهزة المسجلة فوراً وبشكل جذري!"
+  });
 });
 
 app.get('/api/admin/backup', requireAdminAuth, (req, res) => {
-  const db = loadDB();
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Content-Disposition', 'attachment; filename=keys_backup_' + Date.now() + '.json');
-  res.send(JSON.stringify(db, null, 2));
+  res.setHeader('Content-Disposition', `attachment; filename="yalla_backup_${Date.now()}.json"`);
+  res.send(JSON.stringify(memoryDB, null, 2));
 });
 
-app.post('/api/admin/restore', requireAdminAuth, (req, res) => {
-  const incomingData = req.body;
-  if (!incomingData || !Array.isArray(incomingData.keys)) {
-    return res.status(400).json({ success: false, message: "ملف النسخة الاحتياطية غير صالح" });
-  }
-  const db = loadDB();
-  const existingKeyMap = new Map();
-  (db.keys || []).forEach(k => existingKeyMap.set(k.key, k));
-
-  let added = 0;
-  incomingData.keys.forEach(incomingKey => {
-    if (incomingKey && incomingKey.key && incomingKey.key.startsWith('ABOD-') && !existingKeyMap.has(incomingKey.key)) {
-      db.keys.push(incomingKey);
-      added++;
+app.post('/api/admin/restore', requireAdminAuth, async (req, res) => {
+  try {
+    const rawData = req.body;
+    if (!rawData || !Array.isArray(rawData.keys)) {
+      return res.status(400).json({ success: false, message: "ملف النسخة الاحتياطية غير صالح" });
     }
-  });
-
-  saveDB(db);
-  res.json({ success: true, message: 'تم استعادة ودمج ' + added + ' كود بنجاح!' });
+    memoryDB.keys = rawData.keys;
+    if (rawData.epoch) memoryDB.epoch = rawData.epoch;
+    await persistDB(memoryDB);
+    return res.json({ success: true, message: `تمت استعادة ${rawData.keys.length} كود بنجاح!` });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: "فشل الاستعادة: " + err.message });
+  }
 });
 
-// -------------------------------------------------------------
-// 👑 صفحة لوحة التحكم الفاخرة — عبدالإله V4
-// -------------------------------------------------------------
-const DASHBOARD_PAGE_HTML = `<!DOCTYPE html>
+// ==========================================
+// 🎨 لوحة التحكم المتطورة (Executive Theme)
+// ==========================================
+const DASHBOARD_HTML = `
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>عبدالإله 👑 — لوحة التحكم المركزية</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg-main: #0b0f19;
-    --bg-card: #111827;
-    --bg-card-hover: #172033;
-    --border: #1f293d;
-    --border-accent: #374151;
-    --accent: #6366f1;
-    --accent-hover: #4f46e5;
-    --accent-glow: rgba(99, 102, 241, 0.25);
-    --gold: #f59e0b;
-    --text-primary: #f9fafb;
-    --text-secondary: #9ca3af;
-    --text-muted: #6b7280;
-    --danger: #ef4444;
-    --danger-bg: rgba(239, 68, 68, 0.12);
-    --success: #10b981;
-    --success-bg: rgba(16, 185, 129, 0.12);
-    --warning: #f59e0b;
-    --warning-bg: rgba(245, 158, 11, 0.12);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Cairo', sans-serif;
-    background: var(--bg-main);
-    color: var(--text-primary);
-    min-height: 100vh;
-    padding-bottom: 60px;
-    background-image: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.06) 0%, transparent 60%);
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة التحكم | عبدالإله 👑</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 24, 38, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --accent: #f59e0b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --radius: 12px;
+    }
 
-  /* Login Overlay */
-  #loginOverlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(11, 15, 25, 0.98);
-    display: flex; justify-content: center; align-items: center;
-    z-index: 99999;
-  }
-  .login-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-accent);
-    border-radius: 20px;
-    padding: 40px 35px;
-    width: 380px;
-    text-align: center;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(99, 102, 241, 0.1);
-  }
-  .login-card h2 {
-    font-size: 28px;
-    font-weight: 900;
-    margin-bottom: 8px;
-    background: linear-gradient(135deg, #ffffff 40%, var(--gold));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .login-card p {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin-bottom: 25px;
-  }
-  .login-card input {
-    width: 100%;
-    padding: 14px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: #0b0f19;
-    color: #fff;
-    font-family: inherit;
-    font-size: 16px;
-    margin-bottom: 18px;
-    text-align: center;
-    transition: all 0.2s;
-  }
-  .login-card input:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 15px var(--accent-glow);
-  }
-  .login-card button {
-    width: 100%;
-    padding: 13px;
-    background: linear-gradient(135deg, #6366f1, #4f46e5);
-    color: #fff;
-    border: none;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: 800;
-    cursor: pointer;
-    box-shadow: 0 4px 15px var(--accent-glow);
-    transition: transform 0.15s, background 0.2s;
-  }
-  .login-card button:hover {
-    transform: translateY(-2px);
-    background: linear-gradient(135deg, #4f46e5, #4338ca);
-  }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    body {
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.1) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
 
-  /* Header */
-  .header {
-    background: rgba(17, 24, 39, 0.85);
-    backdrop-filter: blur(15px);
-    border-bottom: 1px solid var(--border);
-    padding: 20px 40px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: sticky; top: 0; z-index: 100;
-  }
-  .brand {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-  .brand-title {
-    font-size: 26px;
-    font-weight: 900;
-    background: linear-gradient(135deg, #ffffff 40%, var(--gold));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    letter-spacing: -0.5px;
-  }
-  .brand-subtitle {
-    font-size: 12.5px;
-    color: var(--text-secondary);
-    letter-spacing: 0.3px;
-  }
-  .header-actions {
-    display: flex;
-    gap: 12px;
-  }
-  .btn {
-    font-family: inherit;
-    font-size: 14px;
-    font-weight: 700;
-    padding: 10px 18px;
-    border-radius: 10px;
-    border: none;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s;
-  }
-  .btn-primary {
-    background: linear-gradient(135deg, #6366f1, #4f46e5);
-    color: #fff;
-    box-shadow: 0 4px 15px var(--accent-glow);
-  }
-  .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-  }
-  .btn-danger {
-    background: var(--danger-bg);
-    color: var(--danger);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-  }
-  .btn-danger:hover {
-    background: var(--danger);
-    color: #fff;
-  }
-  .btn-outline {
-    background: transparent;
-    color: var(--text-secondary);
-    border: 1px solid var(--border-accent);
-  }
-  .btn-outline:hover {
-    color: #fff;
-    border-color: var(--text-primary);
-  }
+    header {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
 
-  /* Container & Stats */
-  .container {
-    max-width: 1300px;
-    margin: 30px auto;
-    padding: 0 25px;
-  }
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 20px;
-    margin-bottom: 30px;
-  }
-  .stat-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 22px 25px;
-    position: relative;
-    overflow: hidden;
-  }
-  .stat-card::after {
-    content: '';
-    position: absolute;
-    top: 0; right: 0; width: 4px; height: 100%;
-    background: var(--border-accent);
-  }
-  .stat-card.accent::after { background: var(--accent); }
-  .stat-card.green::after { background: var(--success); }
-  .stat-card.red::after { background: var(--danger); }
-  .stat-label {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin-bottom: 6px;
-  }
-  .stat-value {
-    font-size: 28px;
-    font-weight: 900;
-    color: #fff;
-  }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .brand-badge {
+      background: linear-gradient(135deg, #4f46e5, #ec4899);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
 
-  /* Table Controls */
-  .controls-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 18px;
-    gap: 15px;
-    flex-wrap: wrap;
-  }
-  .search-box {
-    position: relative;
-    flex: 1;
-    max-width: 400px;
-  }
-  .search-box input {
-    width: 100%;
-    padding: 12px 18px 12px 40px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    color: #fff;
-    font-family: inherit;
-    font-size: 14px;
-  }
-  .search-box input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-  .search-icon {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-muted);
-  }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
 
-  /* Table */
-  .table-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: right;
-  }
-  th {
-    background: #0e1422;
-    padding: 16px 20px;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-secondary);
-    border-bottom: 1px solid var(--border);
-  }
-  td {
-    padding: 18px 20px;
-    font-size: 14px;
-    border-bottom: 1px solid rgba(31, 41, 61, 0.6);
-    vertical-align: middle;
-  }
-  tr:hover td {
-    background: var(--bg-card-hover);
-  }
-  .key-code {
-    font-family: 'Courier New', monospace;
-    font-weight: 800;
-    font-size: 15px;
-    color: #a5b4fc;
-    background: rgba(99, 102, 241, 0.1);
-    padding: 4px 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(99, 102, 241, 0.25);
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    letter-spacing: 0.5px;
-  }
-  .owner-tag {
-    font-weight: 700;
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .owner-edit-btn {
-    background: none;
-    border: none;
-    color: var(--accent);
-    cursor: pointer;
-    font-size: 13px;
-    opacity: 0.8;
-    transition: opacity 0.2s;
-  }
-  .owner-edit-btn:hover { opacity: 1; }
-  .note-tag {
-    font-size: 11.5px;
-    color: var(--text-muted);
-    margin-top: 3px;
-  }
-  .device-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .device-friendly-name {
-    font-weight: 700;
-    color: #34d399;
-  }
-  .device-raw {
-    font-size: 11.5px;
-    color: var(--text-muted);
-    font-family: monospace;
-  }
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
-    border-radius: 8px;
-    font-size: 12.5px;
-    font-weight: 700;
-  }
-  .badge-active { background: var(--success-bg); color: var(--success); }
-  .badge-blocked { background: var(--danger-bg); color: var(--danger); }
-  .badge-pending { background: var(--warning-bg); color: var(--warning); }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
+    .btn-danger:hover { background: var(--danger); color: white; }
+    .btn-secondary { background: rgba(255, 255, 255, 0.05); color: var(--text); border-color: var(--card-border); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+    .btn-sm { padding: 4px 8px; font-size: 12px; }
 
-  .actions-cell {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-  .act-btn {
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 12.5px;
-    font-weight: 700;
-    cursor: pointer;
-    border: 1px solid transparent;
-    font-family: inherit;
-    transition: all 0.15s;
-  }
-  .act-btn-lock {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-    border-color: rgba(239, 68, 68, 0.3);
-  }
-  .act-btn-lock:hover { background: #ef4444; color: #fff; }
-  .act-btn-unlock {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-    border-color: rgba(16, 185, 129, 0.3);
-  }
-  .act-btn-unlock:hover { background: #10b981; color: #fff; }
-  .act-btn-reset {
-    background: #1f293d;
-    color: var(--text-secondary);
-  }
-  .act-btn-reset:hover { color: #fff; background: #2d3a54; }
-  .act-btn-delete {
-    background: transparent;
-    color: var(--text-muted);
-  }
-  .act-btn-delete:hover { color: var(--danger); }
+    .container {
+      max-width: 1300px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      flex: 1;
+    }
 
-  /* Modals */
-  .modal {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.85);
-    display: none; justify-content: center; align-items: center;
-    z-index: 1000;
-  }
-  .modal-content {
-    background: var(--bg-card);
-    border: 1px solid var(--border-accent);
-    border-radius: 18px;
-    padding: 30px;
-    width: 440px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.7);
-  }
-  .modal-title {
-    color: var(--text-primary);
-    font-size: 20px;
-    font-weight: 800;
-    margin-bottom: 18px;
-  }
-  .form-group {
-    margin-bottom: 16px;
-    text-align: right;
-  }
-  .form-group label {
-    display: block;
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin-bottom: 6px;
-  }
-  .form-group input, .form-group textarea {
-    width: 100%;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    background: #0b0f19;
-    color: #fff;
-    font-family: inherit;
-    font-size: 14px;
-  }
-  .form-group input:focus, .form-group textarea:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 24px;
-  }
-</style>
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      backdrop-filter: blur(8px);
+    }
+    .stat-title { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+    .stat-value { font-size: 28px; font-weight: 800; color: #fff; }
+
+    .control-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .form-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    input, select {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 9px 14px;
+      color: white;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: var(--primary); }
+
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      overflow-x: auto;
+      backdrop-filter: blur(8px);
+    }
+    table { width: 100%; border-collapse: collapse; text-align: right; }
+    th {
+      background: rgba(15, 23, 42, 0.4);
+      padding: 14px 18px;
+      font-size: 13px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+    }
+    td {
+      padding: 14px 18px;
+      font-size: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      vertical-align: middle;
+    }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    .key-badge {
+      font-family: monospace;
+      background: rgba(79, 70, 229, 0.15);
+      border: 1px solid rgba(79, 70, 229, 0.3);
+      color: #a5b4fc;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 14px;
+      user-select: all;
+    }
+    .badge {
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-active { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-blocked { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    .action-btns { display: flex; gap: 6px; }
+
+    #loginModal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #090d16;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .login-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 32px;
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .login-box input {
+      width: 100%;
+      margin: 16px 0;
+      padding: 12px 16px;
+      font-size: 16px;
+      text-align: center;
+    }
+    .login-box .btn { width: 100%; padding: 12px; justify-content: center; font-size: 16px; }
+
+    .device-subtable {
+      margin: 8px 0;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      border: 1px dashed rgba(255, 255, 255, 0.1);
+    }
+    .device-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .device-row:last-child { border-bottom: none; }
+  </style>
 </head>
 <body>
 
-<div id="loginOverlay">
-  <div class="login-card">
-    <h2>عبدالإله 👑</h2>
-    <p>لوحة التحكم المركزية وإدارة التراخيص</p>
-    <input type="text" id="adminPassInput" placeholder="أدخل كلمة المرور (abod2026)" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') doLogin()">
-    <button onclick="doLogin()">تسجيل الدخول</button>
+<div id="loginModal">
+  <div class="login-box">
+    <div style="font-size: 44px; margin-bottom: 12px;">👑</div>
+    <h2 style="margin-bottom: 6px; font-weight: 800;">لوحة تحكم عبدالإله</h2>
+    <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 15px;">أدخل الرمز السري للدخول إلى السيرفر</p>
+    <div style="background: rgba(79, 70, 229, 0.15); border: 1px solid rgba(79, 70, 229, 0.35); border-radius: 8px; padding: 10px; margin-bottom: 12px;">
+      <span style="color:#cbd5e1; font-size: 13px; display: block; margin-bottom: 2px;">🔑 كلمة المرور هي:</span>
+      <span style="color:#fff; font-family: monospace; font-size: 17px; user-select: all; letter-spacing: 1px; display: inline-block; margin-top: 5px; background: #0b0f19; padding: 4px 12px; border-radius: 6px; border: 1px dashed #6366f1;">12Qwaszx@@</span>
+    </div>
+    <input type="text" id="adminPassInput" value="12Qwaszx@@" placeholder="كلمة مرور السيرفر" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="btn btn-primary" onclick="doLogin()">تسجيل الدخول فوراً ⚡</button>
   </div>
 </div>
 
-<header class="header">
+<header>
   <div class="brand">
-    <span class="brand-title">عبدالإله 👑</span>
-    <span class="brand-subtitle">نظام الإدارة المركزي وقفل الأجهزة الصارم V4</span>
+    <span>👑</span>
+    <span>لوحة تحكم عبدالإله</span>
+    <span class="brand-badge">إصدار V4</span>
   </div>
   <div class="header-actions">
-    <button class="btn btn-primary" onclick="openGenerateModal()">➕ توليد كود جديد</button>
-    <button class="btn btn-outline" onclick="exportBackup()">💾 نسخ احتياطي</button>
-    <button class="btn btn-outline" onclick="document.getElementById('restoreInput').click()">📥 استعادة</button>
-    <input type="file" id="restoreInput" style="display:none" onchange="importBackup(event)" accept=".json">
-    <button class="btn btn-danger" onclick="purgeAllPrompt()">🚨 قفل وتصفير الجميع</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportBackup()">📥 تحميل نسخة احتياطية</button>
+    <button class="btn btn-danger btn-sm" onclick="purgeAllData()">🚨 قفل وتصفير شامل</button>
+    <button class="btn btn-secondary btn-sm" onclick="logout()">تسجيل الخروج</button>
   </div>
 </header>
 
 <div class="container">
   <div class="stats-grid">
-    <div class="stat-card accent">
-      <div class="stat-label">إجمالي الأكواد المسجلة</div>
+    <div class="stat-card">
+      <div class="stat-title">إجمالي الأكواد</div>
       <div class="stat-value" id="statTotalKeys">0</div>
     </div>
-    <div class="stat-card green">
-      <div class="stat-label">الأجهزة المفعلة والشغالة</div>
-      <div class="stat-value" id="statApprovedDevices">0</div>
-    </div>
-    <div class="stat-card red">
-      <div class="stat-label">الأكواد المقفلة (Kill-Switch)</div>
-      <div class="stat-value" id="statBlockedCount">0</div>
+    <div class="stat-card">
+      <div class="stat-title">الأكواد والأجهزة النشطة</div>
+      <div class="stat-value" style="color: var(--success);" id="statApprovedDevices">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">حالة قاعدة البيانات السحابية</div>
-      <div class="stat-value" id="statCloudStatus" style="font-size:20px; margin-top:5px;">متصلة ✓</div>
+      <div class="stat-title">المحظورة / المقفلة</div>
+      <div class="stat-value" style="color: var(--danger);" id="statBlockedCount">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">حالة السحابة (MongoDB)</div>
+      <div class="stat-value" style="font-size: 20px; margin-top: 8px;" id="statCloudStatus">فحص...</div>
     </div>
   </div>
 
-  <div class="controls-bar">
-    <div class="search-box">
-      <span class="search-icon">🔍</span>
-      <input type="text" id="search" placeholder="ابحث بكود التفعيل، اسم المشتري، موديل الجهاز..." oninput="filterRows()">
+  <div class="control-panel">
+    <div class="form-group">
+      <input type="text" id="newOwnerName" placeholder="اسم صاحب الكود">
+      <select id="newDuration">
+        <option value="30">30 يوم (شهر)</option>
+        <option value="60">60 يوم (شهرين)</option>
+        <option value="90">90 يوم (3 أشهر)</option>
+        <option value="365">سنة كاملة</option>
+        <option value="3650">دائم مدى الحياة</option>
+      </select>
+      <select id="newMaxDevices">
+        <option value="1">جهاز واحد (افتراضي)</option>
+        <option value="2">جهازين</option>
+        <option value="5">5 أجهزة</option>
+        <option value="16">16 جهاز (أسطول كامل)</option>
+      </select>
+      <button class="btn btn-primary" onclick="generateKey()">⚡ توليد كود جديد</button>
     </div>
-    <div style="font-size:13px; color:var(--text-secondary);">
-      تحديث حقيقي تلقائي كل 10 ثوانٍ
+
+    <div class="form-group">
+      <input type="text" id="searchInput" placeholder="بحث عن كود، اسم، أو جهاز..." oninput="renderTable()">
+      <button class="btn btn-secondary" onclick="loadKeys()">🔄 تحديث</button>
     </div>
   </div>
 
-  <div class="table-card">
+  <div class="table-container">
     <table>
       <thead>
         <tr>
-          <th>كود التفعيل (ABOD)</th>
-          <th>صاحب الكود (الاسم)</th>
-          <th>الجهاز الفعلي المربوط</th>
-          <th>الحالة التشغيلية</th>
-          <th>آخر تواجد / فحص</th>
-          <th>الإجراءات الفورية</th>
+          <th>الكود</th>
+          <th>صاحب الكود</th>
+          <th>الحالة</th>
+          <th>الصلاحية</th>
+          <th>الأجهزة المرتبطة</th>
+          <th>الإجراءات</th>
         </tr>
       </thead>
       <tbody id="keysTableBody">
-        <tr>
-          <td colspan="6" style="text-align:center; padding: 40px; color: var(--text-secondary);">
-            جاري جلب البيانات...
-          </td>
-        </tr>
+        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">جاري التحميل...</td></tr>
       </tbody>
     </table>
   </div>
 </div>
 
-<!-- مودال توليد كود جديد -->
-<div class="modal" id="generateModal">
-  <div class="modal-content">
-    <div class="modal-title">✨ توليد كود تفعيل جديد</div>
-    <div class="form-group">
-      <label>اسم صاحب الكود (المشتري):</label>
-      <input type="text" id="genOwner" placeholder="مثال: فهد الشمري...">
-    </div>
-    <div class="form-group">
-      <label>عدد الأكواد المراد توليدها:</label>
-      <input type="number" id="genCount" value="1" min="1" max="50">
-    </div>
-    <div class="form-group">
-      <label>ملاحظة اختيارية:</label>
-      <input type="text" id="genNote" placeholder="ملاحظة خاصة...">
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeGenerateModal()">إلغاء</button>
-      <button class="btn btn-primary" onclick="submitGenerate()">توليد الكود</button>
-    </div>
-  </div>
-</div>
-
-<!-- مودال تعديل اسم الشخص -->
-<div class="modal" id="editOwnerModal">
-  <div class="modal-content">
-    <div class="modal-title">✏️ تعديل بيانات صاحب الكود</div>
-    <input type="hidden" id="editTargetKey">
-    <div class="form-group">
-      <label>اسم صاحب الكود:</label>
-      <input type="text" id="editOwnerName">
-    </div>
-    <div class="form-group">
-      <label>الملاحظة:</label>
-      <input type="text" id="editOwnerNote">
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeEditOwnerModal()">إلغاء</button>
-      <button class="btn btn-primary" onclick="submitEditOwner()">حفظ التعديل</button>
-    </div>
-  </div>
-</div>
-
 <script>
-let authToken = sessionStorage.getItem('abod_v4_admin_token') || '';
-let allKeys = [];
+let currentToken = sessionStorage.getItem('adminToken') || '';
+let loadedKeys = [];
 
-const IPHONE_NAMES = {
-  'iPhone14,2': 'iPhone 13 Pro',
-  'iPhone14,3': 'iPhone 13 Pro Max',
-  'iPhone14,4': 'iPhone 13 mini',
-  'iPhone14,5': 'iPhone 13',
-  'iPhone14,6': 'iPhone SE (3rd gen)',
-  'iPhone14,7': 'iPhone 14',
-  'iPhone14,8': 'iPhone 14 Plus',
-  'iPhone15,2': 'iPhone 14 Pro',
-  'iPhone15,3': 'iPhone 14 Pro Max',
-  'iPhone15,4': 'iPhone 15',
-  'iPhone15,5': 'iPhone 15 Plus',
-  'iPhone16,1': 'iPhone 15 Pro',
-  'iPhone16,2': 'iPhone 15 Pro Max',
-  'iPhone17,1': 'iPhone 16 Pro',
-  'iPhone17,2': 'iPhone 16 Pro Max',
-  'iPhone17,3': 'iPhone 16',
-  'iPhone17,4': 'iPhone 16 Plus',
-  'iPhone13,1': 'iPhone 12 mini',
-  'iPhone13,2': 'iPhone 12',
-  'iPhone13,3': 'iPhone 12 Pro',
-  'iPhone13,4': 'iPhone 12 Pro Max',
-  'iPhone12,1': 'iPhone 11',
-  'iPhone12,3': 'iPhone 11 Pro',
-  'iPhone12,5': 'iPhone 11 Pro Max',
-  'iPhone11,8': 'iPhone XR',
-  'iPhone11,2': 'iPhone XS',
-  'iPhone11,6': 'iPhone XS Max',
-  'iPhone10,3': 'iPhone X',
-  'iPhone10,6': 'iPhone X'
-};
-
-function formatDeviceModel(raw) {
-  if (!raw) return 'آيفون غير معروف';
-  return IPHONE_NAMES[raw] || raw;
+function checkUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  const tokenFromUrl = params.get('token') || params.get('pass') || params.get('password');
+  if (tokenFromUrl) {
+    currentToken = tokenFromUrl.trim();
+    sessionStorage.setItem('adminToken', currentToken);
+    const url = new URL(window.location);
+    url.searchParams.delete('token');
+    url.searchParams.delete('pass');
+    url.searchParams.delete('password');
+    window.history.replaceState({}, document.title, url.pathname);
+  }
 }
 
-function normalizeToken(str) {
-  if (!str) return '';
-  return String(str)
-    .trim()
-    .toLowerCase()
-    .replace(/[\u0660-\u0669]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x0660 + 48))
-    .replace(/[\u06F0-\u06F9]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x06F0 + 48))
-    .replace(/[-\s_]/g, '');
-}
+let defaultPass = '12Qwaszx@@';
+checkUrlParams();
 
-// تسجيل الدخول التلقائي في حال تم فتح الرابط بـ ?pass=abod2026 أو وجود توكن سابق
 window.addEventListener('DOMContentLoaded', () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const urlPass = urlParams.get('pass') || urlParams.get('token');
-  if (urlPass) {
-    const norm = normalizeToken(urlPass);
-    const inp = document.getElementById('adminPassInput');
-    if (inp) inp.value = norm;
-    testToken(norm);
-  } else if (authToken) {
-    testToken(authToken);
+  const inputElem = document.getElementById('adminPassInput');
+  if (inputElem && !inputElem.value) {
+    inputElem.value = defaultPass;
+  }
+  if (currentToken) {
+    document.getElementById('loginModal').style.display = 'none';
+    loadKeys();
+  } else {
+    document.getElementById('loginModal').style.display = 'flex';
   }
 });
 
 function doLogin() {
-  const raw = document.getElementById('adminPassInput').value;
-  const p = normalizeToken(raw);
-  if (!p) {
-    alert('يرجى إدخال كلمة المرور abod2026');
+  const val = document.getElementById('adminPassInput').value.trim();
+  if (!val) {
+    alert('يرجى كتابة كلمة المرور: 12Qwaszx@@');
     return;
   }
-  testToken(p);
-}
-
-async function testToken(token) {
-  const btn = document.querySelector('#loginOverlay button');
-  if (btn) btn.innerText = 'جاري التحقق...';
-  try {
-    const res = await fetch('/api/admin/keys', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    if (res.ok) {
-      authToken = token;
-      sessionStorage.setItem('abod_v4_admin_token', token);
-      document.getElementById('loginOverlay').style.display = 'none';
-      loadData();
+  currentToken = val;
+  sessionStorage.setItem('adminToken', currentToken);
+  loadKeys((success) => {
+    if (success) {
+      document.getElementById('loginModal').style.display = 'none';
     } else {
-      alert('كلمة المرور غير صحيحة! تأكد من كتابة abod2026');
-      if (btn) btn.innerText = 'تسجيل الدخول';
+      sessionStorage.removeItem('adminToken');
+      currentToken = '';
+      const inputElem = document.getElementById('adminPassInput');
+      if (inputElem) inputElem.value = '12Qwaszx@@';
+      alert('كلمة المرور غير صحيحة! تأكد أن الكود: 12Qwaszx@@');
     }
-  } catch (e) {
-    alert('تعذر الاتصال بالسيرفر أو جاري تشغيل السيرفر، انتظر ثوانٍ وجرب مجدداً.');
-    if (btn) btn.innerText = 'تسجيل الدخول';
-  }
+  });
 }
 
-async function loadData() {
-  try {
-    const res = await fetch('/api/admin/keys', {
-      headers: { 'Authorization': 'Bearer ' + authToken }
-    });
-    const data = await res.json();
-    if (!data.success) return;
+function logout() {
+  sessionStorage.removeItem('adminToken');
+  currentToken = '';
+  document.getElementById('loginModal').style.display = 'flex';
+}
 
-    allKeys = data.keys || [];
-    document.getElementById('statTotalKeys').innerText = allKeys.length;
+function loadKeys(cb) {
+  fetch('/api/admin/keys', {
+    headers: { 'Authorization': 'Bearer ' + currentToken }
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('Unauthorized');
+    return res.json();
+  })
+  .then(data => {
+    loadedKeys = data.keys || [];
+    document.getElementById('statTotalKeys').innerText = (data.stats && data.stats.total_keys) || 0;
     document.getElementById('statApprovedDevices').innerText = (data.stats && data.stats.approved) || 0;
     document.getElementById('statBlockedCount').innerText = (data.stats && data.stats.blocked) || 0;
-    document.getElementById('statCloudStatus').innerText = data.cloud_active ? 'متصلة دائماً ✓' : 'محلي ⚠️';
-
-    renderTable(allKeys);
-  } catch (e) {
-    console.error(e);
-  }
+    document.getElementById('statCloudStatus').innerHTML = data.cloud_active ? '<span style="color:var(--success)">✅ متصلة</span>' : '<span style="color:var(--accent)">⚠️ محلي</span>';
+    renderTable();
+    if (cb) cb(true);
+  })
+  .catch(err => {
+    if (cb) cb(false);
+  });
 }
 
-function renderTable(keys) {
+function renderTable() {
   const tbody = document.getElementById('keysTableBody');
-  if (!keys || keys.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color: var(--text-secondary); font-weight:700;">لا توجد أكواد مسجلة حالياً (تم التصفير الشامل بنجاح)</td></tr>';
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  const filtered = loadedKeys.filter(k => {
+    if (!search) return true;
+    if (k.key.toLowerCase().includes(search)) return true;
+    if (k.owner && k.owner.toLowerCase().includes(search)) return true;
+    if (k.devices && k.devices.some(d => (d.deviceName && d.deviceName.toLowerCase().includes(search)) || (d.deviceId && d.deviceId.toLowerCase().includes(search)))) return true;
+    return false;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">لا توجد أكواد مطابقة</td></tr>';
     return;
   }
 
-  tbody.innerHTML = keys.map(k => {
-    const isKeyBlocked = k.status === 'blocked';
-    const acts = k.activations || [];
-    
-    let deviceCellHtml = '';
-    if (acts.length === 0) {
-      deviceCellHtml = '<span style="color:var(--text-muted); font-size:13px;">بانتظار الربط بأول جهاز...</span>';
-    } else {
-      deviceCellHtml = acts.map(a => {
-        const friendlyModel = formatDeviceModel(a.device_model);
-        const devName = a.device_name || 'iPhone';
-        return '<div class="device-info">' +
-          '<span class="device-friendly-name">📱 ' + friendlyModel + '</span>' +
-          '<span class="device-raw">' + devName + ' (' + (a.device_model || '') + ')</span>' +
-          '<span class="device-raw" style="font-size:10.5px; opacity:0.6;">UDID: ' + a.device_id.substring(0, 14) + '...</span>' +
+  tbody.innerHTML = filtered.map(k => {
+    const isKeyBlocked = (k.status === 'blocked' || k.active === false);
+    const keyStatusBadge = isKeyBlocked ? '<span class="badge badge-blocked">محظور 🛑</span>' : '<span class="badge badge-active">نشط ✅</span>';
+    const expiresText = k.expiresAt ? new Date(k.expiresAt).toLocaleDateString('ar-SA') : 'دائم';
+
+    let devicesHtml = '<span style="color: var(--text-muted); font-size: 13px;">لا يوجد أجهزة مرتبطة</span>';
+    if (k.devices && k.devices.length > 0) {
+      devicesHtml = '<div class="device-subtable">' + k.devices.map(d => {
+        const isDevBlocked = (d.status === 'blocked' || d.approved === false);
+        const devBadge = isDevBlocked ? '<span class="badge badge-blocked">مقفل</span>' : '<span class="badge badge-active">مفعل</span>';
+        return '<div class="device-row">' +
+          '<div><strong>' + (d.deviceName || 'iPhone') + '</strong> <span style="font-size:11px; color:var(--text-muted); font-family:monospace;">(' + d.deviceId.substring(0,8) + '...)</span></div>' +
+          '<div style="display:flex; gap:6px; align-items:center;">' +
+            devBadge +
+            '<button class="btn btn-secondary btn-sm" onclick="toggleDeviceLock(\'' + k.key + '\', \'' + d.deviceId + '\')">' + (isDevBlocked ? 'إلغاء القفل 🔓' : 'قفل 🔒') + '</button>' +
+          '</div>' +
         '</div>';
-      }).join('<hr style="border:0; border-top:1px dashed var(--border); margin:6px 0;">');
+      }).join('') + '</div>';
     }
-
-    let statusHtml = '';
-    if (isKeyBlocked) {
-      statusHtml = '<span class="badge badge-blocked">🔴 مقفل من الإدارة</span>';
-    } else if (acts.some(a => a.status === 'approved')) {
-      statusHtml = '<span class="badge badge-active">🟢 مفعّل وشغال</span>';
-    } else {
-      statusHtml = '<span class="badge badge-pending">⏳ بانتظار أول تفعيل</span>';
-    }
-
-    const lastSeen = acts[0] ? acts[0].last_seen : k.created_at;
-    const lastSeenStr = lastSeen ? new Date(lastSeen).toLocaleString('ar-SA') : 'غير متوفر';
-    const ownerName = k.owner_name || 'غير مسجل';
-    const noteBadge = k.note ? '<div class="note-tag">📝 ' + k.note + '</div>' : '';
 
     return '<tr>' +
+      '<td><span class="key-badge">' + k.key + '</span></td>' +
+      '<td><strong>' + (k.owner || 'مستخدم') + '</strong></td>' +
+      '<td>' + keyStatusBadge + '</td>' +
+      '<td>' + expiresText + '</td>' +
+      '<td style="max-width: 320px;">' + devicesHtml + '</td>' +
       '<td>' +
-        '<div class="key-code">' +
-          k.key +
-          ' <button onclick="copyText(\'' + k.key + '\')" style="background:none; border:none; cursor:pointer; font-size:13px;" title="نسخ الكود">📋</button>' +
-        '</div>' +
-      '</td>' +
-      '<td>' +
-        '<div class="owner-tag">' +
-          '👤 ' + ownerName +
-          ' <button class="owner-edit-btn" onclick="openEditOwnerModal(\'' + k.key + '\', \'' + encodeURIComponent(ownerName) + '\', \'' + encodeURIComponent(k.note || '') + '\')" title="تعديل اسم الشخص">✏️</button>' +
-        '</div>' +
-        noteBadge +
-      '</td>' +
-      '<td>' + deviceCellHtml + '</td>' +
-      '<td>' + statusHtml + '</td>' +
-      '<td style="color:var(--text-secondary); font-size:12.5px;">' + lastSeenStr + '</td>' +
-      '<td>' +
-        '<div class="actions-cell">' +
-          '<button class="act-btn ' + (isKeyBlocked ? 'act-btn-unlock' : 'act-btn-lock') + '" onclick="toggleKeyLock(\'' + k.key + '\')">' +
-            (isKeyBlocked ? '🔓 تفعيل الأداة' : '🔒 قفل الأداة') +
-          '</button>' +
-          '<button class="act-btn act-btn-reset" onclick="resetKeyHWID(\'' + k.key + '\')" title="فك ارتباط الجهاز الحالي">' +
-            '🔄 فك الارتباط' +
-          '</button>' +
-          '<button class="act-btn act-btn-delete" onclick="deleteKeyPermanent(\'' + k.key + '\')" title="حذف نهائي">' +
-            '🗑️' +
-          '</button>' +
+        '<div class="action-btns">' +
+          '<button class="btn btn-secondary btn-sm" onclick="editOwner(\'' + k.key + '\', \'' + (k.owner || '') + '\')">✏️ تعديل</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="toggleKeyLock(\'' + k.key + '\')">' + (isKeyBlocked ? 'تفعيل الكود' : 'حظر الكود') + '</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="resetDevices(\'' + k.key + '\')">🔄 تصفير الأجهزة</button>' +
+          '<button class="btn btn-danger btn-sm" onclick="deleteKey(\'' + k.key + '\')">🗑️ حذف</button>' +
         '</div>' +
       '</td>' +
     '</tr>';
   }).join('');
 }
 
-function openGenerateModal() {
-  document.getElementById('genOwner').value = '';
-  document.getElementById('genNote').value = '';
-  document.getElementById('generateModal').style.display = 'flex';
-}
-function closeGenerateModal() {
-  document.getElementById('generateModal').style.display = 'none';
-}
+function generateKey() {
+  const owner = document.getElementById('newOwnerName').value.trim();
+  const duration = document.getElementById('newDuration').value;
+  const maxDevices = document.getElementById('newMaxDevices').value;
 
-async function submitGenerate() {
-  const count = parseInt(document.getElementById('genCount').value) || 1;
-  const owner_name = document.getElementById('genOwner').value.trim();
-  const note = document.getElementById('genNote').value.trim();
-
-  const res = await fetch('/api/admin/generate', {
+  fetch('/api/admin/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-    body: JSON.stringify({ count, owner_name, note })
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken },
+    body: JSON.stringify({ owner, durationDays: duration, maxDevices })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      document.getElementById('newOwnerName').value = '';
+      loadKeys();
+      alert('تم توليد الكود بنجاح:\\n' + data.key.key);
+    }
   });
-  const data = await res.json();
-  if (data.success) {
-    closeGenerateModal();
-    loadData();
-    alert('✅ تم توليد ' + data.count + ' كود بنجاح لصاحب الكود: ' + (owner_name || 'بدون اسم'));
+}
+
+function editOwner(key, oldOwner) {
+  const newOwner = prompt('أدخل الاسم الجديد لصاحب الكود:', oldOwner);
+  if (newOwner && newOwner.trim() && newOwner !== oldOwner) {
+    fetch('/api/admin/edit_owner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken },
+      body: JSON.stringify({ key, newOwner: newOwner.trim() })
+    })
+    .then(res => res.json())
+    .then(() => loadKeys());
   }
 }
 
-function openEditOwnerModal(key, encodedName, encodedNote) {
-  document.getElementById('editTargetKey').value = key;
-  document.getElementById('editOwnerName').value = decodeURIComponent(encodedName);
-  document.getElementById('editOwnerNote').value = decodeURIComponent(encodedNote);
-  document.getElementById('editOwnerModal').style.display = 'flex';
-}
-function closeEditOwnerModal() {
-  document.getElementById('editOwnerModal').style.display = 'none';
-}
-
-async function submitEditOwner() {
-  const key = document.getElementById('editTargetKey').value;
-  const owner_name = document.getElementById('editOwnerName').value.trim();
-  const note = document.getElementById('editOwnerNote').value.trim();
-
-  const res = await fetch('/api/admin/edit_owner', {
+function toggleKeyLock(key) {
+  fetch('/api/admin/toggle_lock', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-    body: JSON.stringify({ key, owner_name, note })
-  });
-  const data = await res.json();
-  if (data.success) {
-    closeEditOwnerModal();
-    loadData();
-  }
-}
-
-async function toggleKeyLock(key) {
-  const res = await fetch('/api/admin/toggle_lock', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken },
     body: JSON.stringify({ key })
-  });
-  const data = await res.json();
-  if (data.success) {
-    loadData();
+  })
+  .then(res => res.json())
+  .then(() => loadKeys());
+}
+
+function toggleDeviceLock(key, deviceId) {
+  fetch('/api/admin/lock_device', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken },
+    body: JSON.stringify({ key, deviceId })
+  })
+  .then(res => res.json())
+  .then(() => loadKeys());
+}
+
+function resetDevices(key) {
+  if (confirm('هل أنت متأكد من تصفير ارتباط الأجهزة بهذا الكود؟')) {
+    fetch('/api/admin/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken },
+      body: JSON.stringify({ key })
+    })
+    .then(res => res.json())
+    .then(() => loadKeys());
   }
 }
 
-async function resetKeyHWID(key) {
-  if (!confirm('هل تريد فك ارتباط الجهاز المرتبط بهذا الكود؟')) return;
-  const res = await fetch('/api/admin/reset', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-    body: JSON.stringify({ key })
-  });
-  const data = await res.json();
-  alert(data.message);
-  loadData();
-}
-
-async function deleteKeyPermanent(key) {
-  if (!confirm('هل أنت متأكد من حذف هذا الكود نهائياً؟ ستتوقف الأداة عند المستخدم فوراً.')) return;
-  const res = await fetch('/api/admin/delete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-    body: JSON.stringify({ key })
-  });
-  const data = await res.json();
-  loadData();
-}
-
-async function purgeAllPrompt() {
-  const pass = prompt('🚨 تحذير: سيتم قفل وإلغاء جميع النسخ والأكواد فوراً! اكتب كلمة المرور للتأكيد:');
-  if (normalizeToken(pass) !== 'abod2026') {
-    if (pass !== null) alert('كلمة المرور غير صحيحة!');
-    return;
+function deleteKey(key) {
+  if (confirm('هل أنت متأكد من حذف الكود؟ سيتم قفل الأداة عند صاحبه نهائياً!')) {
+    fetch('/api/admin/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken },
+      body: JSON.stringify({ key })
+    })
+    .then(res => res.json())
+    .then(() => loadKeys());
   }
-  const res = await fetch('/api/admin/purge_all', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }
-  });
-  const data = await res.json();
-  alert(data.message);
-  loadData();
 }
 
-function copyText(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    alert('تم نسخ الكود: ' + text);
-  });
+function purgeAllData() {
+  const ans = prompt('🚨 تحذير خطير: هذا الخيار سيحذف كافة الأكواد ويقفل الأداة على جميع الناس نهائياً! اكتب (نعم) للتأكيد:');
+  if (ans === 'نعم') {
+    fetch('/api/admin/purge_all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken }
+    })
+    .then(res => res.json())
+    .then(data => {
+      alert(data.message);
+      loadKeys();
+    });
+  }
 }
 
 function exportBackup() {
-  window.open('/api/admin/backup?token=' + encodeURIComponent(authToken), '_blank');
-}
-
-function importBackup(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async (event) => {
-    try {
-      const json = JSON.parse(event.target.result);
-      const res = await fetch('/api/admin/restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-        body: JSON.stringify(json)
-      });
-      const result = await res.json();
-      alert(result.message || 'تمت الاستعادة بنجاح');
-      loadData();
-    } catch (err) {
-      alert('ملف النسخة الاحتياطية غير صالح');
-    }
-  };
-  reader.readAsText(file);
-}
-
-function filterRows() {
-  const q = document.getElementById('search').value.toLowerCase().trim();
-  if (!q) {
-    renderTable(allKeys);
-    return;
-  }
-  const filtered = allKeys.filter(k => {
-    if (k.key && k.key.toLowerCase().includes(q)) return true;
-    if (k.owner_name && k.owner_name.toLowerCase().includes(q)) return true;
-    if (k.note && k.note.toLowerCase().includes(q)) return true;
-    return (k.activations || []).some(a => {
-      const friendly = formatDeviceModel(a.device_model).toLowerCase();
-      const rawModel = (a.device_model || '').toLowerCase();
-      const devName = (a.device_name || '').toLowerCase();
-      const devId = (a.device_id || '').toLowerCase();
-      return friendly.includes(q) || rawModel.includes(q) || devName.includes(q) || devId.includes(q);
-    });
-  });
-  renderTable(filtered);
+  window.open('/api/admin/backup?token=' + encodeURIComponent(currentToken), '_blank');
 }
 </script>
 </body>
-</html>`;
+</html>
+`;
 
 app.get(['/' + ADMIN_PATH, '/abod', '/admin', '/login'], (req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(DASHBOARD_PAGE_HTML);
+  res.send(DASHBOARD_HTML);
 });
 
-// توجيه تلقائي إذا فتح المستخدم الرابط الرئيسي ومعه كلمة المرور
 app.get('/', (req, res, next) => {
-  if (req.query && (req.query.pass || req.query.token)) {
-    return res.redirect('/' + ADMIN_PATH + '?pass=' + encodeURIComponent(req.query.pass || req.query.token));
+  if (req.headers.accept && req.headers.accept.includes('text/html')) {
+    return res.send(DASHBOARD_HTML);
   }
   next();
 });
 
-// أي مسار API أو طلب POST غير معتمد يُرد عليه فوراً بكود قفل متوافق مع كافة الإصدارات القديمة والجديدة
 app.all('/api/*', (req, res) => {
   res.json(buildLockedResponse("Key Expired or Invalid"));
 });
@@ -1526,7 +1170,6 @@ app.post('*', (req, res) => {
   res.json(buildLockedResponse("Key Expired or Invalid"));
 });
 
-// صفحة 404 للمسارات العادية غير المعروفة (Stealth Mode)
 app.use((req, res) => {
   res.status(404).send('<!DOCTYPE html><html><head><title>404 Not Found</title></head><body style="font-family: sans-serif; padding: 40px; background: #fff; color: #222;"><h1>404 Not Found</h1><p>The requested URL ' + req.originalUrl + ' was not found on this server.</p><hr><address style="font-size: 13px; color: #777;">Apache/2.4.52 (Ubuntu) Server</address></body></html>');
 });
