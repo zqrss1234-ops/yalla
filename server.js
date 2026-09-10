@@ -47,7 +47,6 @@ function loadLocalFileDB() {
     const parsed = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     if (!parsed.keys) parsed.keys = [];
     if (parsed.epoch !== CURRENT_EPOCH) {
-      console.log("🚨 [V4 HARD RESET] تصفير وقفل شامل لكافة الأكواد والـ HWID السابقة!");
       parsed.keys = [];
       parsed.epoch = CURRENT_EPOCH;
       parsed.secretSalt = JWT_SECRET_SALT;
@@ -81,12 +80,10 @@ if (MONGO_URI) {
       const db = client.db('yallasniper_cloud');
       mongoCollection = db.collection('system_state');
       isMongoActive = true;
-      console.log("✅ [MONGODB ATLAS] متصل بنجاح بالسحابة الدائمة!");
 
       const remoteDoc = await mongoCollection.findOne({ _id: 'master_license_store' });
       if (remoteDoc) {
         if (remoteDoc.epoch !== CURRENT_EPOCH) {
-          console.log("🚨 [MONGO V4 PURGE] تصفير السحابة نهائياً!");
           await mongoCollection.updateOne(
             { _id: 'master_license_store' },
             { $set: { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
@@ -94,8 +91,7 @@ if (MONGO_URI) {
           );
           memoryDB = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
         } else {
-          console.log(`📥 [MONGO SYNC] تم تحميل ${remoteDoc.keys ? remoteDoc.keys.length : 0} كود من السحابة`);
-          memoryDB = { epoch: CURRENT_EPOCH, keys: remoteDoc.keys, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
+          memoryDB = { epoch: CURRENT_EPOCH, keys: remoteDoc.keys || [], adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT };
         }
       } else {
         await mongoCollection.updateOne(
@@ -106,7 +102,6 @@ if (MONGO_URI) {
       }
       saveLocalDB(memoryDB);
     } catch (err) {
-      console.warn("⚠️ [MONGO] تعذر الاتصال بـ MongoDB. الاعتماد على التخزين المحلي:", err.message);
       isMongoActive = false;
     }
   })();
@@ -122,14 +117,12 @@ async function persistDB(data) {
         { $set: { keys: data.keys, adminToken: ADMIN_TOKEN, secretSalt: JWT_SECRET_SALT, updatedAt: new Date().toISOString() } },
         { upsert: true }
       );
-    } catch (e) {
-      console.error("[MONGO WRITE ERROR]", e.message);
-    }
+    } catch (e) {}
   }
 }
 
 // ==========================================
-// 🔒 دالة الرفض والإغلاق الشامل لكافة الأجهزة غير المصرح بها
+// 🔒 دالة الرفض والإغلاق الشامل لكافة الأجهزة
 // ==========================================
 function buildLockedResponse(msg) {
   return {
@@ -589,24 +582,22 @@ app.post('/api/admin/restore', requireAdminAuth, async (req, res) => {
 });
 
 // ==========================================
-// 🎨 لوحة التحكم المتطورة (Executive Theme)
+// 🎨 صفحة لوحة التحكم (الآمنة والمحترمة)
 // ==========================================
-const DASHBOARD_HTML = `
-<!DOCTYPE html>
+const DASHBOARD_HTML = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>لوحة التحكم | عبدالإله 👑</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #090d16;
-      --card-bg: rgba(18, 24, 38, 0.85);
+      --card-bg: rgba(18, 24, 38, 0.88);
       --card-border: rgba(255, 255, 255, 0.08);
       --primary: #4f46e5;
       --primary-hover: #4338ca;
-      --accent: #f59e0b;
       --text: #f8fafc;
       --text-muted: #94a3b8;
       --success: #10b981;
@@ -620,7 +611,7 @@ const DASHBOARD_HTML = `
       background-color: var(--bg);
       background-image:
         radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.15) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.1) 0px, transparent 50%);
+        radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.08) 0px, transparent 50%);
       background-attachment: fixed;
       color: var(--text);
       min-height: 100vh;
@@ -629,7 +620,7 @@ const DASHBOARD_HTML = `
     }
 
     header {
-      background: rgba(15, 23, 42, 0.75);
+      background: rgba(15, 23, 42, 0.85);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--card-border);
       padding: 16px 24px;
@@ -647,12 +638,11 @@ const DASHBOARD_HTML = `
       gap: 12px;
       font-size: 20px;
       font-weight: 800;
-      letter-spacing: -0.5px;
     }
     .brand-badge {
       background: linear-gradient(135deg, #4f46e5, #ec4899);
       color: white;
-      padding: 4px 10px;
+      padding: 3px 10px;
       border-radius: 6px;
       font-size: 13px;
       font-weight: 700;
@@ -663,7 +653,7 @@ const DASHBOARD_HTML = `
     .btn {
       padding: 8px 16px;
       border-radius: 8px;
-      font-weight: 600;
+      font-weight: 700;
       font-size: 14px;
       cursor: pointer;
       display: inline-flex;
@@ -676,9 +666,9 @@ const DASHBOARD_HTML = `
     .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
     .btn-danger { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
     .btn-danger:hover { background: var(--danger); color: white; }
-    .btn-secondary { background: rgba(255, 255, 255, 0.05); color: var(--text); border-color: var(--card-border); }
-    .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
-    .btn-sm { padding: 4px 8px; font-size: 12px; }
+    .btn-secondary { background: rgba(255, 255, 255, 0.06); color: var(--text); border-color: var(--card-border); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
+    .btn-sm { padding: 5px 10px; font-size: 13px; }
 
     .container {
       max-width: 1300px;
@@ -719,7 +709,7 @@ const DASHBOARD_HTML = `
 
     .form-group { display: flex; gap: 8px; flex-wrap: wrap; }
     input, select {
-      background: rgba(15, 23, 42, 0.6);
+      background: rgba(15, 23, 42, 0.7);
       border: 1px solid var(--card-border);
       border-radius: 8px;
       padding: 9px 14px;
@@ -738,7 +728,7 @@ const DASHBOARD_HTML = `
     }
     table { width: 100%; border-collapse: collapse; text-align: right; }
     th {
-      background: rgba(15, 23, 42, 0.4);
+      background: rgba(15, 23, 42, 0.5);
       padding: 14px 18px;
       font-size: 13px;
       color: var(--text-muted);
@@ -772,7 +762,7 @@ const DASHBOARD_HTML = `
     .badge-active { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
     .badge-blocked { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
 
-    .action-btns { display: flex; gap: 6px; }
+    .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 
     #loginModal {
       position: fixed;
@@ -786,19 +776,21 @@ const DASHBOARD_HTML = `
     .login-box {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      padding: 32px;
+      padding: 36px;
       border-radius: var(--radius);
       width: 100%;
-      max-width: 420px;
+      max-width: 400px;
       text-align: center;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
     }
     .login-box input {
       width: 100%;
-      margin: 16px 0;
+      margin: 18px 0;
       padding: 12px 16px;
       font-size: 16px;
       text-align: center;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
     }
     .login-box .btn { width: 100%; padding: 12px; justify-content: center; font-size: 16px; }
 
@@ -824,15 +816,12 @@ const DASHBOARD_HTML = `
 
 <div id="loginModal">
   <div class="login-box">
-    <div style="font-size: 44px; margin-bottom: 12px;">👑</div>
+    <div style="font-size: 48px; margin-bottom: 12px;">👑</div>
     <h2 style="margin-bottom: 6px; font-weight: 800;">لوحة تحكم عبدالإله</h2>
-    <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 15px;">أدخل الرمز السري للدخول إلى السيرفر</p>
-    <div style="background: rgba(79, 70, 229, 0.15); border: 1px solid rgba(79, 70, 229, 0.35); border-radius: 8px; padding: 10px; margin-bottom: 12px;">
-      <span style="color:#cbd5e1; font-size: 13px; display: block; margin-bottom: 2px;">🔑 كلمة المرور هي:</span>
-      <span style="color:#fff; font-family: monospace; font-size: 17px; user-select: all; letter-spacing: 1px; display: inline-block; margin-top: 5px; background: #0b0f19; padding: 4px 12px; border-radius: 6px; border: 1px dashed #6366f1;">12Qwaszx@@</span>
-    </div>
-    <input type="text" id="adminPassInput" value="12Qwaszx@@" placeholder="كلمة مرور السيرفر" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') doLogin()">
-    <button class="btn btn-primary" onclick="doLogin()">تسجيل الدخول فوراً ⚡</button>
+    <p style="color: var(--text-muted); font-size: 14px;">أدخل كلمة المرور للمتابعة</p>
+    <div id="loginError" style="display:none; color:#fca5a5; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:8px; margin-top:12px; font-size:13px; font-weight:700;"></div>
+    <input type="password" id="adminPassInput" placeholder="أدخل كلمة المرور" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="btn btn-primary" id="loginSubmitBtn" onclick="doLogin()">تسجيل الدخول ⚡</button>
   </div>
 </div>
 
@@ -843,9 +832,9 @@ const DASHBOARD_HTML = `
     <span class="brand-badge">إصدار V4</span>
   </div>
   <div class="header-actions">
-    <button class="btn btn-secondary btn-sm" onclick="exportBackup()">📥 تحميل نسخة احتياطية</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportBackup()">📥 نسخة احتياطية</button>
     <button class="btn btn-danger btn-sm" onclick="purgeAllData()">🚨 قفل وتصفير شامل</button>
-    <button class="btn btn-secondary btn-sm" onclick="logout()">تسجيل الخروج</button>
+    <button class="btn btn-secondary btn-sm" onclick="logout()">خروج</button>
   </div>
 </header>
 
@@ -856,7 +845,7 @@ const DASHBOARD_HTML = `
       <div class="stat-value" id="statTotalKeys">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-title">الأكواد والأجهزة النشطة</div>
+      <div class="stat-title">الأكواد النشطة</div>
       <div class="stat-value" style="color: var(--success);" id="statApprovedDevices">0</div>
     </div>
     <div class="stat-card">
@@ -914,7 +903,7 @@ const DASHBOARD_HTML = `
 </div>
 
 <script>
-let currentToken = sessionStorage.getItem('adminToken') || '';
+let currentToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || '';
 let loadedKeys = [];
 
 function checkUrlParams() {
@@ -923,6 +912,7 @@ function checkUrlParams() {
   if (tokenFromUrl) {
     currentToken = tokenFromUrl.trim();
     sessionStorage.setItem('adminToken', currentToken);
+    localStorage.setItem('adminToken', currentToken);
     const url = new URL(window.location);
     url.searchParams.delete('token');
     url.searchParams.delete('pass');
@@ -931,17 +921,17 @@ function checkUrlParams() {
   }
 }
 
-let defaultPass = '12Qwaszx@@';
 checkUrlParams();
 
 window.addEventListener('DOMContentLoaded', () => {
-  const inputElem = document.getElementById('adminPassInput');
-  if (inputElem && !inputElem.value) {
-    inputElem.value = defaultPass;
-  }
   if (currentToken) {
-    document.getElementById('loginModal').style.display = 'none';
-    loadKeys();
+    loadKeys((success) => {
+      if (success) {
+        document.getElementById('loginModal').style.display = 'none';
+      } else {
+        document.getElementById('loginModal').style.display = 'flex';
+      }
+    });
   } else {
     document.getElementById('loginModal').style.display = 'flex';
   }
@@ -949,29 +939,44 @@ window.addEventListener('DOMContentLoaded', () => {
 
 function doLogin() {
   const val = document.getElementById('adminPassInput').value.trim();
+  const errDiv = document.getElementById('loginError');
+  const btn = document.getElementById('loginSubmitBtn');
+  errDiv.style.display = 'none';
+
   if (!val) {
-    alert('يرجى كتابة كلمة المرور: 12Qwaszx@@');
+    errDiv.innerText = 'يرجى إدخال كلمة المرور';
+    errDiv.style.display = 'block';
     return;
   }
+
+  btn.innerText = 'جاري التحقق...';
+  btn.disabled = true;
+
   currentToken = val;
   sessionStorage.setItem('adminToken', currentToken);
+  localStorage.setItem('adminToken', currentToken);
+
   loadKeys((success) => {
+    btn.innerText = 'تسجيل الدخول ⚡';
+    btn.disabled = false;
     if (success) {
       document.getElementById('loginModal').style.display = 'none';
     } else {
       sessionStorage.removeItem('adminToken');
+      localStorage.removeItem('adminToken');
       currentToken = '';
-      const inputElem = document.getElementById('adminPassInput');
-      if (inputElem) inputElem.value = '12Qwaszx@@';
-      alert('كلمة المرور غير صحيحة! تأكد أن الكود: 12Qwaszx@@');
+      errDiv.innerText = 'كلمة المرور غير صحيحة!';
+      errDiv.style.display = 'block';
     }
   });
 }
 
 function logout() {
   sessionStorage.removeItem('adminToken');
+  localStorage.removeItem('adminToken');
   currentToken = '';
   document.getElementById('loginModal').style.display = 'flex';
+  document.getElementById('adminPassInput').value = '';
 }
 
 function loadKeys(cb) {
@@ -987,7 +992,7 @@ function loadKeys(cb) {
     document.getElementById('statTotalKeys').innerText = (data.stats && data.stats.total_keys) || 0;
     document.getElementById('statApprovedDevices').innerText = (data.stats && data.stats.approved) || 0;
     document.getElementById('statBlockedCount').innerText = (data.stats && data.stats.blocked) || 0;
-    document.getElementById('statCloudStatus').innerHTML = data.cloud_active ? '<span style="color:var(--success)">✅ متصلة</span>' : '<span style="color:var(--accent)">⚠️ محلي</span>';
+    document.getElementById('statCloudStatus').innerHTML = data.cloud_active ? '<span style="color:var(--success)">✅ متصلة</span>' : '<span style="color:var(--text-muted)">محلي</span>';
     renderTable();
     if (cb) cb(true);
   })
@@ -1002,14 +1007,14 @@ function renderTable() {
 
   const filtered = loadedKeys.filter(k => {
     if (!search) return true;
-    if (k.key.toLowerCase().includes(search)) return true;
+    if (k.key && k.key.toLowerCase().includes(search)) return true;
     if (k.owner && k.owner.toLowerCase().includes(search)) return true;
     if (k.devices && k.devices.some(d => (d.deviceName && d.deviceName.toLowerCase().includes(search)) || (d.deviceId && d.deviceId.toLowerCase().includes(search)))) return true;
     return false;
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">لا توجد أكواد مطابقة</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">لا توجد أي أكواد مسجلة (النظام مصفّر بالكامل)</td></tr>';
     return;
   }
 
@@ -1023,15 +1028,20 @@ function renderTable() {
       devicesHtml = '<div class="device-subtable">' + k.devices.map(d => {
         const isDevBlocked = (d.status === 'blocked' || d.approved === false);
         const devBadge = isDevBlocked ? '<span class="badge badge-blocked">مقفل</span>' : '<span class="badge badge-active">مفعل</span>';
+        const keyEscaped = encodeURIComponent(k.key);
+        const devEscaped = encodeURIComponent(d.deviceId);
         return '<div class="device-row">' +
           '<div><strong>' + (d.deviceName || 'iPhone') + '</strong> <span style="font-size:11px; color:var(--text-muted); font-family:monospace;">(' + d.deviceId.substring(0,8) + '...)</span></div>' +
           '<div style="display:flex; gap:6px; align-items:center;">' +
             devBadge +
-            '<button class="btn btn-secondary btn-sm" onclick="toggleDeviceLock(\'' + k.key + '\', \'' + d.deviceId + '\')">' + (isDevBlocked ? 'إلغاء القفل 🔓' : 'قفل 🔒') + '</button>' +
+            '<button class="btn btn-secondary btn-sm" onclick="toggleDeviceLock(\'' + keyEscaped + '\', \'' + devEscaped + '\')">' + (isDevBlocked ? 'إلغاء القفل 🔓' : 'قفل 🔒') + '</button>' +
           '</div>' +
         '</div>';
       }).join('') + '</div>';
     }
+
+    const safeKey = encodeURIComponent(k.key);
+    const safeOwner = encodeURIComponent(k.owner || '');
 
     return '<tr>' +
       '<td><span class="key-badge">' + k.key + '</span></td>' +
@@ -1041,10 +1051,10 @@ function renderTable() {
       '<td style="max-width: 320px;">' + devicesHtml + '</td>' +
       '<td>' +
         '<div class="action-btns">' +
-          '<button class="btn btn-secondary btn-sm" onclick="editOwner(\'' + k.key + '\', \'' + (k.owner || '') + '\')">✏️ تعديل</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick="toggleKeyLock(\'' + k.key + '\')">' + (isKeyBlocked ? 'تفعيل الكود' : 'حظر الكود') + '</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick="resetDevices(\'' + k.key + '\')">🔄 تصفير الأجهزة</button>' +
-          '<button class="btn btn-danger btn-sm" onclick="deleteKey(\'' + k.key + '\')">🗑️ حذف</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="editOwner(\'' + safeKey + '\', \'' + safeOwner + '\')">✏️ تعديل</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="toggleKeyLock(\'' + safeKey + '\')">' + (isKeyBlocked ? 'تفعيل' : 'حظر') + '</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="resetDevices(\'' + safeKey + '\')">🔄 تصفير الأجهزة</button>' +
+          '<button class="btn btn-danger btn-sm" onclick="deleteKey(\'' + safeKey + '\')">🗑️ حذف</button>' +
         '</div>' +
       '</td>' +
     '</tr>';
@@ -1066,12 +1076,14 @@ function generateKey() {
     if (data.success) {
       document.getElementById('newOwnerName').value = '';
       loadKeys();
-      alert('تم توليد الكود بنجاح:\\n' + data.key.key);
+      alert('تم توليد الكود بنجاح:\n' + data.key.key);
     }
   });
 }
 
-function editOwner(key, oldOwner) {
+function editOwner(encodedKey, encodedOldOwner) {
+  const key = decodeURIComponent(encodedKey);
+  const oldOwner = decodeURIComponent(encodedOldOwner);
   const newOwner = prompt('أدخل الاسم الجديد لصاحب الكود:', oldOwner);
   if (newOwner && newOwner.trim() && newOwner !== oldOwner) {
     fetch('/api/admin/edit_owner', {
@@ -1084,7 +1096,8 @@ function editOwner(key, oldOwner) {
   }
 }
 
-function toggleKeyLock(key) {
+function toggleKeyLock(encodedKey) {
+  const key = decodeURIComponent(encodedKey);
   fetch('/api/admin/toggle_lock', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken },
@@ -1094,7 +1107,9 @@ function toggleKeyLock(key) {
   .then(() => loadKeys());
 }
 
-function toggleDeviceLock(key, deviceId) {
+function toggleDeviceLock(encodedKey, encodedDeviceId) {
+  const key = decodeURIComponent(encodedKey);
+  const deviceId = decodeURIComponent(encodedDeviceId);
   fetch('/api/admin/lock_device', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + currentToken },
@@ -1104,7 +1119,8 @@ function toggleDeviceLock(key, deviceId) {
   .then(() => loadKeys());
 }
 
-function resetDevices(key) {
+function resetDevices(encodedKey) {
+  const key = decodeURIComponent(encodedKey);
   if (confirm('هل أنت متأكد من تصفير ارتباط الأجهزة بهذا الكود؟')) {
     fetch('/api/admin/reset', {
       method: 'POST',
@@ -1116,7 +1132,8 @@ function resetDevices(key) {
   }
 }
 
-function deleteKey(key) {
+function deleteKey(encodedKey) {
+  const key = decodeURIComponent(encodedKey);
   if (confirm('هل أنت متأكد من حذف الكود؟ سيتم قفل الأداة عند صاحبه نهائياً!')) {
     fetch('/api/admin/delete', {
       method: 'POST',
@@ -1148,15 +1165,16 @@ function exportBackup() {
 }
 </script>
 </body>
-</html>
-`;
+</html>`;
 
 app.get(['/' + ADMIN_PATH, '/abod', '/admin', '/login'], (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(DASHBOARD_HTML);
 });
 
 app.get('/', (req, res, next) => {
   if (req.headers.accept && req.headers.accept.includes('text/html')) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(DASHBOARD_HTML);
   }
   next();
