@@ -97,7 +97,6 @@ function loadLocalFileDB() {
     const parsed = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     if (!parsed.keys) parsed.keys = [];
     if (parsed.epoch !== CURRENT_EPOCH) {
-      parsed.keys = [];
       parsed.epoch = CURRENT_EPOCH;
       saveLocalDB(parsed);
     }
@@ -127,15 +126,14 @@ if (MONGO_URI) {
       mongoCollection = client.db('yallasniper_cloud').collection('system_state');
       isMongoActive = true;
       const doc = await mongoCollection.findOne({ _id: 'master_license_store' });
-      if (doc && doc.epoch === CURRENT_EPOCH) {
-        memoryDB = { epoch: CURRENT_EPOCH, keys: doc.keys || [], adminToken: ADMIN_TOKEN };
+      if (doc && doc.keys && doc.keys.length > 0) {
+        memoryDB = { epoch: CURRENT_EPOCH, keys: doc.keys, adminToken: ADMIN_TOKEN };
       } else {
         await mongoCollection.updateOne(
           { _id: 'master_license_store' },
-          { $set: { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN, updatedAt: new Date().toISOString() } },
+          { $set: { epoch: CURRENT_EPOCH, keys: memoryDB.keys, adminToken: ADMIN_TOKEN, updatedAt: new Date().toISOString() } },
           { upsert: true }
         );
-        memoryDB = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN };
       }
       saveLocalDB(memoryDB);
     } catch (err) {
@@ -478,6 +476,21 @@ app.get('/api/admin/backup', requireAdminAuth, (req, res) => {
   res.send(JSON.stringify(memoryDB, null, 2));
 });
 
+app.post('/api/admin/restore', requireAdminAuth, async (req, res) => {
+  try {
+    const incoming = req.body;
+    if (!incoming || !incoming.keys || !Array.isArray(incoming.keys)) {
+      return res.status(400).json({ success: false, message: 'ملف الاستعادة غير صالح' });
+    }
+    memoryDB.keys = incoming.keys;
+    if (incoming.epoch) memoryDB.epoch = incoming.epoch;
+    await persistDB(memoryDB);
+    return res.json({ success: true, message: 'تم استعادة كافة الأكواد بنجاح ✅', count: memoryDB.keys.length });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ============================================================
 // 👑 واجهة لوحة القيادة الفخمة (Executive Luxury Dashboard HTML)
 // ============================================================
@@ -592,6 +605,9 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
   <div class="header-actions">
     <div class="time-badge" id="liveClock">--:--:--</div>
     <div class="server-status-pill"><span class="pulse-dot"></span><span>السيرفر متصل بنشاط</span></div>
+    <button class="btn btn-secondary btn-sm" id="btnBackup">💾 نسخة احتياطية</button>
+    <button class="btn btn-secondary btn-sm" id="btnRestore">📥 استعادة الأكواد</button>
+    <input type="file" id="restoreFileInput" accept=".json" style="display:none">
     <button class="btn btn-danger btn-sm" id="btnPurgeAll">🚨 قفل وتصفير شامل على الجميع</button>
     <button class="btn btn-secondary btn-sm" id="btnLogout">خروج</button>
   </div>
@@ -985,9 +1001,53 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     }
   });
 
-  document.getElementById('btnDownloadBackup').addEventListener('click', function() {
-    window.open('/api/admin/backup?token=' + encodeURIComponent(token), '_blank');
-  });
+  var btnBk = document.getElementById('btnBackup');
+  if (btnBk) {
+    btnBk.addEventListener('click', function() {
+      window.open('/api/admin/backup?token=' + encodeURIComponent(token), '_blank');
+    });
+  }
+
+  var btnRes = document.getElementById('btnRestore');
+  var fileInp = document.getElementById('restoreFileInput');
+  if (btnRes && fileInp) {
+    btnRes.addEventListener('click', function() {
+      fileInp.click();
+    });
+    fileInp.addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          var parsed = JSON.parse(ev.target.result);
+          req('/api/admin/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(parsed)
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            alert(d.message || 'تمت استعادة الأكواد بنجاح ✅');
+            loadData();
+          })
+          .catch(function(err) {
+            alert('فشلت الاستعادة: ' + err.message);
+          });
+        } catch (parseErr) {
+          alert('ملف JSON غير صالح: ' + parseErr.message);
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  var btnDlBk = document.getElementById('btnDownloadBackup');
+  if (btnDlBk) {
+    btnDlBk.addEventListener('click', function() {
+      window.open('/api/admin/backup?token=' + encodeURIComponent(token), '_blank');
+    });
+  }
 
   if (token) {
     loadData(function(ok) {
