@@ -29,7 +29,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 const CURRENT_EPOCH = "V6_ABOD_EXECUTIVE_2026";
 const ADMIN_PATH = process.env.ADMIN_PATH || "abod-master-7788";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "12Qwaszx@@";
-const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || "";
+const DEFAULT_MONGO_URI = "mongodb+srv://zqrss1234_db_user:y49bOzYGFqZ2Qy00@cluster0.jalx3az.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || DEFAULT_MONGO_URI;
 
 const DB_FILE = path.join(__dirname, 'database.json');
 let memoryDB = { epoch: CURRENT_EPOCH, keys: [], adminToken: ADMIN_TOKEN };
@@ -117,30 +118,54 @@ function saveLocalDB(data) {
 
 memoryDB = loadLocalFileDB();
 
-if (MONGO_URI) {
-  (async () => {
-    try {
-      const { MongoClient } = require('mongodb');
-      const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 5000 });
-      await client.connect();
-      mongoCollection = client.db('yallasniper_cloud').collection('system_state');
-      isMongoActive = true;
-      const doc = await mongoCollection.findOne({ _id: 'master_license_store' });
-      if (doc && doc.keys && doc.keys.length > 0) {
-        memoryDB = { epoch: CURRENT_EPOCH, keys: doc.keys, adminToken: ADMIN_TOKEN };
-      } else {
-        await mongoCollection.updateOne(
-          { _id: 'master_license_store' },
-          { $set: { epoch: CURRENT_EPOCH, keys: memoryDB.keys, adminToken: ADMIN_TOKEN, updatedAt: new Date().toISOString() } },
-          { upsert: true }
-        );
-      }
-      saveLocalDB(memoryDB);
-    } catch (err) {
-      isMongoActive = false;
+// V63: MongoDB connection with auto-reconnect
+let mongoClient = null;
+
+async function connectMongoDB() {
+  if (!MONGO_URI) return;
+  try {
+    const { MongoClient } = require('mongodb');
+    mongoClient = new MongoClient(MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 30000,
+    });
+    await mongoClient.connect();
+    mongoCollection = mongoClient.db('yallasniper_cloud').collection('system_state');
+    isMongoActive = true;
+    console.log('[V63-MONGO] ✅ Connected to MongoDB Atlas — cloud_active=true');
+
+    // Sync: load cloud keys or seed from local
+    const doc = await mongoCollection.findOne({ _id: 'master_license_store' });
+    if (doc && doc.keys && doc.keys.length > 0) {
+      memoryDB = { epoch: CURRENT_EPOCH, keys: doc.keys, adminToken: ADMIN_TOKEN };
+      console.log(`[V63-MONGO] Loaded ${doc.keys.length} keys from cloud`);
+    } else {
+      await mongoCollection.updateOne(
+        { _id: 'master_license_store' },
+        { $set: { epoch: CURRENT_EPOCH, keys: memoryDB.keys, adminToken: ADMIN_TOKEN, updatedAt: new Date().toISOString() } },
+        { upsert: true }
+      );
+      console.log(`[V63-MONGO] Seeded cloud with ${memoryDB.keys.length} local keys`);
     }
-  })();
+    saveLocalDB(memoryDB);
+
+    // Monitor connection events for auto-reconnect
+    mongoClient.on('close', () => {
+      console.log('[V63-MONGO] ⚠️ Connection closed — scheduling reconnect in 10s');
+      isMongoActive = false;
+      mongoCollection = null;
+      setTimeout(connectMongoDB, 10000);
+    });
+  } catch (err) {
+    isMongoActive = false;
+    mongoCollection = null;
+    console.log(`[V63-MONGO] ❌ Connection failed: ${err.message} — retrying in 10s`);
+    setTimeout(connectMongoDB, 10000);
+  }
 }
+
+connectMongoDB();
 
 async function persistDB(data) {
   memoryDB = data;
@@ -152,7 +177,12 @@ async function persistDB(data) {
         { $set: { keys: data.keys, adminToken: ADMIN_TOKEN, updatedAt: new Date().toISOString() } },
         { upsert: true }
       );
-    } catch (e) {}
+    } catch (e) {
+      console.log(`[V63-MONGO] persistDB error: ${e.message} — will auto-reconnect`);
+      isMongoActive = false;
+      mongoCollection = null;
+      setTimeout(connectMongoDB, 5000);
+    }
   }
 }
 
